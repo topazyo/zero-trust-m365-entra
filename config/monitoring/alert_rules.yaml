@@ -1,0 +1,32 @@
+alert_rules:
+  high_risk_signin:
+    name: "High Risk Sign-in Detection"
+    description: "Detects potentially compromised sign-in attempts"
+    query: |
+      SigninLogs
+      | where RiskLevelDuringSignIn == "high"
+      | where UserPrincipalName in (privileged_users)
+    threshold: 1
+    time_window: PT1H
+    severity: High
+    actions:
+      - type: email
+        recipients: ["security@company.com"]
+      - type: azure_function
+        function_name: "BlockUser"
+
+  privilege_escalation:
+    name: "Privilege Escalation Detection"
+    description: "Detects unauthorized privilege elevation attempts"
+    query: |
+      AuditLogs
+      | where OperationType == "Add member to role"
+      | where TargetResources has "Admin"
+    threshold: 1
+    time_window: PT24H
+    severity: Critical
+    actions:
+      - type: incident
+        severity: High
+      - type: webhook
+        url: "https://security.webhook.com/incident"

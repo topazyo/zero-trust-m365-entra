@@ -1,0 +1,15 @@
+{
+    "policies": {
+        "adminAccess": {
+            "name": "Admin Access Policy",
+            "conditions": {
+                "userRisk": ["high"],
+                "signInRisk": ["medium", "high"],
+                "locations": {
+                    "exclude": ["trusted"]
+                }
+            },
+            "controls": ["mfa", "deviceCompliance"]
+        }
+    }
+}
