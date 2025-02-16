@@ -1,0 +1,127 @@
+# PowerShell
+*.ps1.test
+*.psm1.test
+*.psd1.test
+*.ps1xml
+*.dll
+*.pdb
+
+# Environment Configuration
+.env
+.env.*
+config/secrets/
+credentials.json
+*_credentials.json
+connection-string.txt
+
+# Development Environment
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+
+# Logs and Debugging
+logs/
+*.log
+debug/
+temp/
+tmp/
+
+# Test Results
+TestResults/
+[Tt]est[Rr]esult*/
+coverage/
+*.coverage
+.coverage
+coverage.json
+coverage.xml
+
+# Package Management
+packages/
+*.nupkg
+# Package Files
+*.nuget.props
+*.nuget.targets
+
+# Azure
+*.azurePubxml
+*.pubxml
+*.publishproj
+PublishProfiles/
+*.publishsettings
+
+# Security and Certificates
+*.pfx
+*.cer
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+
+# Documentation Build
+docs/_build/
+docs/_site/
+_site/
+
+# Dependencies
+node_modules/
+bower_components/
+
+# Build Results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# Reports and Output
+reports/
+output/
+*.report
+*.csv
+*.xlsx
+!template/*.xlsx
+
+# Cache and Temporary Files
+*.cache
+*.tmp
+*.temp
+*~
+.DS_Store
+Thumbs.db
+
+# Backup Files
+*.bak
+*.backup
+*backup*
+*.old
+*.orig
+
+# Local Development
+local.settings.json
+appsettings.*.json
+!appsettings.json
+!appsettings.example.json
+
+# PowerShell Module Development
+*.pssproj
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Specific to this project
+src/config/sensitive/
+src/credentials/
+monitoring/private/
+*.private.ps1
+*-private.json
