@@ -160,7 +160,7 @@ class SecurityIncidentResponder {
     hidden [void] _LoadSecurityPlaybooks() {
         Write-Host "SecurityIncidentResponder._LoadSecurityPlaybooks() (enhanced) called."
         if ($null -eq $this.PlaybookManager) { Write-Warning "_LoadSecurityPlaybooks: PlaybookManager not initialized!"; return }
-        $this.PlaybookManager.LoadPlaybooks("./playbooks"); $this.SecurityPlaybooks = $this.PlaybookManager.LoadedPlaybooks
+        $this.PlaybookManager.LoadPlaybooks("../../playbooks"); $this.SecurityPlaybooks = $this.PlaybookManager.LoadedPlaybooks
         Write-Host "Playbooks loaded via PlaybookManager. Total playbooks: $($this.SecurityPlaybooks.Count)"
     }
 
