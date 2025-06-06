@@ -4,15 +4,27 @@ class ThreatDetectionSystem {
     [System.Collections.Generic.Queue[object]]$ThreatQueue
     hidden [object]$AIModel
 
-    ThreatDetectionSystem([string]$tenantId) {
+    ThreatDetectionSystem([string]$tenantId, [string]$ModelPath = $null) {
         $this.TenantId = $tenantId
-        $this.InitializeAIModel()
+        $this.InitializeAIModel($ModelPath)
         $this.ThreatQueue = [System.Collections.Generic.Queue[object]]::new()
     }
 
-    [void]InitializeAIModel() {
+    [void]InitializeAIModel([string]$SuppliedModelPath = $null) {
+        $resolvedModelPath = $null
+        if ($null -ne $SuppliedModelPath) {
+            if (Test-Path -Path $SuppliedModelPath -PathType Leaf) {
+                $resolvedModelPath = $SuppliedModelPath
+                Write-Host "AI Model: Using provided model path: $resolvedModelPath"
+            } else {
+                Write-Warning "AI Model: Provided model path '$SuppliedModelPath' not found."
+            }
+        } else {
+            Write-Warning "AI Model: No model path provided. AI-based threat detection features will be limited."
+        }
+
         $modelConfig = @{
-            ModelPath = "./models/threat_detection.onnx"
+            ModelPath = $resolvedModelPath # This will be $null if not found/provided
             Threshold = 0.85
             Features = @(
                 "login_patterns",
@@ -21,10 +33,26 @@ class ThreatDetectionSystem {
                 "network_behavior"
             )
         }
+        # The New-ThreatDetectionModel cmdlet would need to handle a null ModelPath gracefully.
         $this.AIModel = New-ThreatDetectionModel $modelConfig
+        if ($null -eq $this.AIModel) {
+            Write-Warning "AI Model: Failed to initialize. ThreatDetectionSystem will operate with limited capabilities."
+        }
     }
 
     [object]AnalyzeUserBehavior([string]$userId, [int]$timeWindowHours = 24) {
+        if ($null -eq $this.AIModel) {
+            Write-Warning "AI Model not available. Skipping AI-based anomaly scoring in AnalyzeUserBehavior."
+            # Return a structure indicating no AI analysis was performed or default values
+            return @{
+                UserId = $userId
+                AnomalyScore = 0 # Default score
+                RiskPatterns = @{} # Empty patterns
+                Timestamp = [DateTime]::UtcNow
+                RecommendedActions = @("Manual review recommended due to unavailable AI Model") # Default action
+                Notes = "AI Model was not initialized."
+            }
+        }
         try {
             # Collect user activity data
             $userData = $this.CollectUserData($userId, $timeWindowHours)
