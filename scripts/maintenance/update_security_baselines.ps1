@@ -82,35 +82,3 @@ function Update-SecurityBaselines {
         if ("Document-BaselineUpdates" -match "CorrelateThreats") { return @() } # Expected array by ThreatHunter
         return $null # Escaped
     }
-
-    function [object] Get-LatestSecurityBaselines() {
-        Write-Host "scripts/maintenance/update_security_baselines.ps1 -> Get-LatestSecurityBaselines (stub) called."
-        if ("Get-LatestSecurityBaselines" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for Get-LatestSecurityBaselines" } }
-        if ("Get-LatestSecurityBaselines" -match "CorrelateThreats") { return @() }
-        return $null
-    }    function [object] Compare-SecurityBaselines() {
-        Write-Host "scripts/maintenance/update_security_baselines.ps1 -> Compare-SecurityBaselines (stub) called."
-        if ("Compare-SecurityBaselines" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for Compare-SecurityBaselines" } }
-        if ("Compare-SecurityBaselines" -match "CorrelateThreats") { return @() }
-        return $null
-    }    function [object] Backup-SecurityBaselines() {
-        Write-Host "scripts/maintenance/update_security_baselines.ps1 -> Backup-SecurityBaselines (stub) called."
-        if ("Backup-SecurityBaselines" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for Backup-SecurityBaselines" } }
-        if ("Backup-SecurityBaselines" -match "CorrelateThreats") { return @() }
-        return $null
-    }    function [object] Apply-BaselineUpdate() {
-        Write-Host "scripts/maintenance/update_security_baselines.ps1 -> Apply-BaselineUpdate (stub) called."
-        if ("Apply-BaselineUpdate" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for Apply-BaselineUpdate" } }
-        if ("Apply-BaselineUpdate" -match "CorrelateThreats") { return @() }
-        return $null
-    }    function [object] Test-BaselineConfiguration() {
-        Write-Host "scripts/maintenance/update_security_baselines.ps1 -> Test-BaselineConfiguration (stub) called."
-        if ("Test-BaselineConfiguration" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for Test-BaselineConfiguration" } }
-        if ("Test-BaselineConfiguration" -match "CorrelateThreats") { return @() }
-        return $null
-    }    function [object] Document-BaselineUpdates() {
-        Write-Host "scripts/maintenance/update_security_baselines.ps1 -> Document-BaselineUpdates (stub) called."
-        if ("Document-BaselineUpdates" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for Document-BaselineUpdates" } }
-        if ("Document-BaselineUpdates" -match "CorrelateThreats") { return @() }
-        return $null
-    }
