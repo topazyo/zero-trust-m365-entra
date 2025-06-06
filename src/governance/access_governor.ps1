@@ -13,10 +13,10 @@ class AccessGovernor {
     [void]EnforceAccessGovernance() {
         try {
             # Get current access state
-            $accessState = $this.GetAccessState()
+            $_accessState = $this.GetAccessState() # Renamed local variable
             
             # Identify violations
-            $violations = $this.IdentifyPolicyViolations($accessState)
+            $violations = $this.IdentifyPolicyViolations($_accessState) # Use renamed variable
             
             # Generate remediation tasks
             $remediationTasks = $this.CreateRemediationTasks($violations)
@@ -28,6 +28,9 @@ class AccessGovernor {
             }
             
             # Update governance records
+            # Assuming UpdateGovernanceRecords might use the access state or tasks.
+            # If it needs the original access state, ensure it's passed or accessible.
+            # For now, just using tasks as per original logic.
             $this.UpdateGovernanceRecords($remediationTasks)
         }
         catch {

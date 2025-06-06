@@ -1,0 +1,21 @@
+{
+  "name": "DefaultPlaybookFromFile",
+  "description": "Default playbook loaded from file for unclassified incidents.",
+  "version": "1.0.1",
+  "defaultClassification": ["Unclassified", "Default"],
+  "steps": [
+    {
+      "id": "default_step1",
+      "name": "Log Unclassified Incident",
+      "actionType": "LogMessage",
+      "parameters": { "message": "Unclassified incident handled by DefaultPlaybookFromFile.", "level": "Info" },
+      "onSuccess": "default_step2"
+    },
+    {
+      "id": "default_step2",
+      "name": "Tag Unclassified Incident",
+      "actionType": "TagIncident",
+      "parameters": { "tagName": "NeedsManualReview" }
+    }
+  ]
+}
