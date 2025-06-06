@@ -4329,7 +4329,8 @@ param (
 function Install-RequiredModules {
     [CmdletBinding()]
     param (
-        [hashtable]$modules
+        [hashtable]$modules,
+        [string]$ConfigPath # Added to access installation.json for module details
     )
 
     Write-Host "Starting REAL module installation and verification..."
