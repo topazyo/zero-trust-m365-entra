@@ -1,10 +1,10 @@
-class SecurityAnalyticsEngine {
+class MonitoringAnalyticsEngine {
     [string]$WorkspaceId
     [hashtable]$AnalyticsRules
     [object]$MLModel
     hidden [object]$DataLakeConnection
 
-    SecurityAnalyticsEngine([string]$workspaceId) {
+    MonitoringAnalyticsEngine([string]$workspaceId) {
         $this.WorkspaceId = $workspaceId
         $this.InitializeAnalytics()
         $this.LoadMLModel()
