@@ -192,7 +192,7 @@ class SecurityIncidentResponder {
 
     hidden [object] _ExecuteAction([object]$action, [object]$context) {
         Write-Host "SecurityIncidentResponder._ExecuteAction() (Corrected for RunPSScript & Logging) called for action type: $($action.actionType)"
-        Write-Host ""Context received by _ExecuteAction (IncidentId: '', Keys: ' )"" # More detailed log
+        Write-Host "Context received by _ExecuteAction (IncidentId: '', Keys: ' )" # More detailed log
         $actionType = $action.actionType
         $parameters = $action.parameters
         $result = @{ Status = "Failed"; Output = "Action type '$actionType' not implemented or failed."; StartTime = (Get-Date)}
