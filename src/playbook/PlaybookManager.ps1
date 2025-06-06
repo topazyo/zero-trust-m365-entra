@@ -7,29 +7,27 @@ class PlaybookManager {
     }
 
     [void] LoadPlaybooks([string]$directoryPath) {
-        Write-Host "PlaybookManager.LoadPlaybooks called for directory: $directoryPath (stubbed - will be enhanced)"
-        # Stub implementation, to be replaced in Part 4
-        $this.LoadedPlaybooks = @{
-            "DefaultPlaybook" = @{
-                "name" = "Default Incident Response Playbook";
-                "description" = "Placeholder playbook from PlaybookManager stub.";
-                "version" = "1.0";
-                "defaultClassification" = @("Unclassified");
-                "steps" = @(
-                    @{ "id" = "step1"; "name" = "Log Default Incident"; "actionType" = "LogMessage"; "parameters" = @{ "message" = "Incident logged by default playbook (via PlaybookManager)." }; "level" = "Info" }
-                )
-            }
-            "MalwarePlaybook" = @{ # For _ClassifyIncident to potentially pick
-                "name" = "Basic Malware Response Playbook";
-                "description" = "Handles basic malware alerts.";
-                "version" = "1.0";
-                "defaultClassification" = @("MalwareDetection");
-                 "steps" = @(
-                    @{ "id" = "mstep1"; "name" = "Log Malware Detection"; "actionType" = "LogMessage"; "parameters" = @{ "message" = "Malware detected. Incident escalated by playbook." }; "level" = "Warning" },
-                    @{ "id" = "mstep2"; "name" = "Tag Malware Incident"; "actionType" = "TagIncident"; "parameters" = @{ "tagName" = "MalwareAlert" } }
-                )
+        Write-Host "PlaybookManager.LoadPlaybooks (JSON File Loader) called for directory: $directoryPath"
+        $this.LoadedPlaybooks = @{} # Clear any existing
+        if (-not (Test-Path $directoryPath -PathType Container)) {
+            Write-Error "Playbook directory '$directoryPath' not found."
+            return
+        }
+        Get-ChildItem -Path $directoryPath -Filter "*.json" | ForEach-Object {
+            Write-Host "Loading playbook from file: $($_.FullName)"
+            try {
+                $playbookContent = Get-Content -Path $_.FullName -Raw | ConvertFrom-Json -ErrorAction Stop
+                if ($null -ne $playbookContent.name) {
+                    $this.LoadedPlaybooks[$playbookContent.name] = $playbookContent
+                    Write-Host "Successfully loaded playbook: $($playbookContent.name)"
+                } else {
+                    Write-Warning "Playbook file $($_.Name) does not have a 'name' property."
+                }
+            } catch {
+                Write-Error "Failed to load or parse playbook file $($_.Name): $($_.Exception.Message)"
             }
         }
+        Write-Host "PlaybookManager finished loading. Total playbooks: $($this.LoadedPlaybooks.Count)"
     }
 
     [object] GetPlaybook([string]$playbookName) {
@@ -38,6 +36,6 @@ class PlaybookManager {
             return $this.LoadedPlaybooks[$playbookName]
         }
         Write-Warning "Playbook '$playbookName' not found by PlaybookManager."
-        return $null
+        return $null # Or return a default playbook if that's desired
     }
 }

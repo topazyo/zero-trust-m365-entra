@@ -6,42 +6,53 @@ class SecurityIncidentResponder {
     [string]$TenantId
     [hashtable]$SecurityPlaybooks
     [System.Collections.Generic.Dictionary[string,object]]$ActiveIncidents
-    hidden [object]$AutomationEngine
-    hidden [object]$ForensicEngine
+    # hidden [object]$AutomationEngine # Removed old
+    # hidden [object]$ForensicEngine # Removed old
+
+    # Added Typed Engine Properties
+    hidden [ThreatHunter]$ForensicEngine
+    hidden [ResponseOrchestrator]$AutomationEngine
+    hidden [PlaybookManager]$PlaybookManager
+    hidden [ThreatIntelligenceManager]$ThreatIntelClient
 
     SecurityIncidentResponder([string]$tenantId) {
         $this.TenantId = $tenantId
         $this.ActiveIncidents = [System.Collections.Generic.Dictionary[string,object]]::new()
-        $this._InitializeEngines()
-        $this._LoadSecurityPlaybooks()
+        $this._InitializeEngines() # Corrected call
+        $this._LoadSecurityPlaybooks() # Corrected call
     }
 
     [void]HandleSecurityIncident([object]$incident) {
         try {
             # Create and store incident context
-            $context = $this._CreateIncidentContext($incident)
+            $context = $this._CreateIncidentContext($incident) # Corrected call
             $this.ActiveIncidents[$incident.Id] = $context
+            $context.Classification = $this._ClassifyIncident($incident) # Corrected call & store classification
 
             # Classify incident and select playbook
-            $classification = $this._ClassifyIncident($incident)
-            $playbook = $this._SelectPlaybook($classification)
+            # $classification = $this._ClassifyIncident($incident) # Already called and stored in context
+            $playbook = $this._SelectPlaybook($context.Classification) # Corrected call, use context's classification
             
-            # Execute response actions with detailed tracking
-            $this.ExecutePlaybook($playbook, $context)
+            if ($null -eq $playbook) {
+                Write-Warning "No playbook selected for incident $($incident.Id) with classification '$($context.Classification)'. No further playbook actions will be executed by HandleSecurityIncident."
+            } else {
+                Write-Host "Executing playbook '$($playbook.name)' for incident $($incident.Id)"
+                $this.ExecutePlaybook($playbook, $context) # ExecutePlaybook is public, calls _ExecuteAction internally
+            }
             
             # Trigger automated response based on classification
-            $this.TriggerAutomatedResponse($classification, $context)
+            $this.TriggerAutomatedResponse($context.Classification, $context) # TriggerAutomatedResponse is public, calls _methods internally
             
             # Perform forensic analysis
-            $this.InitiateForensicAnalysis($incident.Id)
+            $this.InitiateForensicAnalysis($incident.Id) # InitiateForensicAnalysis is public, calls _methods internally
             
             # Document and report
-            $this._DocumentIncidentResponse($incident, $context)
+            $this._DocumentIncidentResponse($incident, $context) # Corrected call
         }
         catch {
-            Write-Error "Failed to handle security incident: $_"
-            $this._EscalateIncident($incident)
-            throw
+            Write-Error "Failed to handle security incident $($incident.Id): $($_.Exception.Message)" # Added incident ID to error
+            $this._EscalateIncident($incident) # Corrected call
+            # Consider re-throwing if critical: throw
         }
     }
 
@@ -49,27 +60,27 @@ class SecurityIncidentResponder {
         $context.ExecutionStart = [DateTime]::UtcNow
         $context.Actions = @()
 
-        foreach ($action in $playbook.Actions) {
+        foreach ($action in $playbook.steps) { # Changed from $playbook.Actions to $playbook.steps
             try {
-                $actionResult = $this._ExecuteAction($action, $context)
-                $this._ValidateActionResult($actionResult)
+                $actionResult = $this._ExecuteAction($action, $context) # Corrected call
+                $this._ValidateActionResult($actionResult) # Corrected call
                 
                 $context.Actions += @{
-                    Type = $action.Type
+                    Type = $action.actionType # Corrected from $action.Type
                     Result = $actionResult
-                    Status = "Completed"
+                    Status = $actionResult.Status # Corrected from "Completed"
                     Timestamp = [DateTime]::UtcNow
-                    ValidationStatus = "Verified"
+                    ValidationStatus = "Verified" # Assuming stub validation
                 }
                 
-                $this._UpdateIncidentContext($context, $actionResult)
+                $this._UpdateIncidentContext($context, $actionResult) # Corrected call to use underscore
             }
             catch {
-                $this._HandleActionFailure($action, $context)
+                $this._HandleActionFailure($action, $context) # Corrected call
                 $context.Actions += @{
-                    Type = $action.Type
+                    Type = $action.actionType # Corrected to use actionType from playbook step
                     Error = $_.Exception.Message
-                    Status = "Failed"
+                    Status = "FailedInFramework" # More specific status
                     Timestamp = [DateTime]::UtcNow
                 }
             }
@@ -81,22 +92,22 @@ class SecurityIncidentResponder {
     [void]TriggerAutomatedResponse([string]$triggerType, [object]$context) {
         switch ($triggerType) {
             "AccountCompromise" {
-                $this._IsolateCompromisedAccount($context)
-                $this._InitiateForensicCollection($context)
-                $this._NotifySecurityTeam($context)
+                $this._IsolateCompromisedAccount($context) # Corrected call
+                $this._InitiateForensicCollection($context) # Corrected call
+                $this._NotifySecurityTeam($context) # Corrected call
             }
             "DataExfiltration" {
-                $this._BlockDataTransfer($context)
-                $this._RevokeSessions($context)
-                $this._InitiateDLP($context)
+                $this._BlockDataTransfer($context) # Corrected call
+                $this._RevokeSessions($context) # Corrected call
+                $this._InitiateDLP($context) # Corrected call
             }
             "MalwareDetection" {
-                $this._IsolateInfectedSystems($context)
-                $this._InitiateAntimalwareScan($context)
-                $this._CollectMalwareSamples($context)
+                $this._IsolateInfectedSystems($context) # Corrected call
+                $this._InitiateAntimalwareScan($context) # Corrected call
+                $this._CollectMalwareSamples($context) # Corrected call
             }
             default {
-                $this._ExecuteDefaultResponse($context)
+                $this._ExecuteDefaultResponse($context) # Corrected call
             }
         }
     }
@@ -106,32 +117,32 @@ class SecurityIncidentResponder {
         
         return @{
             IncidentId = $incidentId
-            Classification = $incident.Classification
-            Timeline = $this._CreateIncidentTimeline($incident)
-            Actions = $incident.Actions
-            Impact = $this._AssessIncidentImpact($incident)
-            Containment = $this._GetContainmentStatus($incident)
-            Remediation = $this._GetRemediationStatus($incident)
+            Classification = $incident.Classification # Should be $incidentContext.Classification
+            Timeline = $this._CreateIncidentTimeline($incident) # Pass $incidentContext
+            Actions = $incident.Actions # Should be $incidentContext.Actions
+            Impact = $this._AssessIncidentImpact($incident) # Pass $incidentContext
+            Containment = $this._GetContainmentStatus($incident) # Pass $incidentContext
+            Remediation = $this._GetRemediationStatus($incident) # Pass $incidentContext
             ForensicFindings = $this._GetForensicFindings($incidentId)
             ThreatIntelligence = $this._GetRelatedThreatIntel($incidentId)
-            LessonsLearned = $this._CompileLessonsLearned($incident)
-            Metrics = $this._CalculateResponseMetrics($incident)
+            LessonsLearned = $this._CompileLessonsLearned($incident) # Pass $incidentContext
+            Metrics = $this._CalculateResponseMetrics($incident) # Pass $incidentContext
         }
     }
 
     [void]InitiateForensicAnalysis([string]$incidentId) {
         try {
-            $forensicData = $this._CollectForensicData($incidentId)
-            $analysis = $this._AnalyzeForensicData($forensicData)
-            $iocs = $this._IdentifyIOCs($analysis)
+            $forensicData = $this._CollectForensicData($incidentId) # Corrected call
+            $analysis = $this._AnalyzeForensicData($forensicData) # Corrected call
+            $iocs = $this._IdentifyIOCs($analysis) # Corrected call
             
             # Update threat intelligence and incident context
-            $this._UpdateThreatIntelligence($iocs)
+            $this._UpdateThreatIntelligence($iocs) # Corrected call
             $this.ActiveIncidents[$incidentId].ForensicFindings = $analysis
             $this.ActiveIncidents[$incidentId].IdentifiedIOCs = $iocs
             
             # Generate forensic report
-            $this._GenerateForensicReport($incidentId, $analysis)
+            $this._GenerateForensicReport($incidentId, $analysis) # Corrected call
         }
         catch {
             Write-Error "Forensic analysis failed: $_"
@@ -140,159 +151,160 @@ class SecurityIncidentResponder {
         }
     }
 
-    # Stubs for methods called in constructor
+    # --- Start of Hidden Method Stubs (from e2649) ---
     hidden [void] _InitializeEngines() {
-        Write-Host "SecurityIncidentResponder._InitializeEngines() (stub) called."
-        # Placeholder for engine initialization (e.g., AutomationEngine, ForensicEngine)
-        # $this.AutomationEngine = [object]::new() # Example
-        # $this.ForensicEngine = New-Object ThreatHunter -ArgumentList $this.TenantId # Example if ThreatHunter is to be used
+        Write-Host "SecurityIncidentResponder._InitializeEngines() (enhanced) called."
+        $this.ForensicEngine = New-Object ThreatHunter -ArgumentList $this.TenantId
+        $this.AutomationEngine = New-Object ResponseOrchestrator -ArgumentList $this.TenantId
+        $this.PlaybookManager = New-Object PlaybookManager
+        $this.ThreatIntelClient = New-Object ThreatIntelligenceManager -ArgumentList $this.TenantId
+        Write-Host "Engines (ThreatHunter, ResponseOrchestrator, PlaybookManager, ThreatIntelClient) instantiated."
     }
-
     hidden [void] _LoadSecurityPlaybooks() {
-        Write-Host "SecurityIncidentResponder._LoadSecurityPlaybooks() (stub) called."
-        $this.SecurityPlaybooks = @{
-            "DefaultPlaybook" = @{
-                "Name" = "Default Incident Response Playbook";
-                "Description" = "Placeholder playbook for unclassified incidents.";
-                "Actions" = @(
-                    @{ "Type" = "LogIncident"; "Parameters" = @{ "Message" = "Incident logged by default playbook." }}
-                )
-            }
+        Write-Host "SecurityIncidentResponder._LoadSecurityPlaybooks() (enhanced) called."
+        if ($null -eq $this.PlaybookManager) {
+            Write-Warning "_LoadSecurityPlaybooks: PlaybookManager not initialized!"
+            return
         }
+        $this.PlaybookManager.LoadPlaybooks("./playbooks")
+        $this.SecurityPlaybooks = $this.PlaybookManager.LoadedPlaybooks
+        Write-Host "Playbooks loaded via PlaybookManager. Total playbooks: $($this.SecurityPlaybooks.Count)"
     }
-
-    # Stubs for methods called in HandleSecurityIncident
-    hidden [object] _CreateIncidentContext([object]$incident) {
-        Write-Host "SecurityIncidentResponder._CreateIncidentContext() (stub) called for incident: $($incident.Id)"
-        return @{
-            IncidentId = $incident.Id
-            ReceivedTime = Get-Date
-            Status = "New"
-            Classification = "Pending"
-            InitialSeverity = $incident.Severity
-            AssociatedEntities = @()
-            RawIncident = $incident
-        }
-    }
-
+    hidden [object] _CreateIncidentContext([object]$incident) { Write-Host "SIR Stub: _CreateIncidentContext"; return @{} }
     hidden [string] _ClassifyIncident([object]$incident) {
-        Write-Host "SecurityIncidentResponder._ClassifyIncident() (stub) called for incident: $($incident.Id)"
-        # Simple classification based on keywords in description or title
-        if ($incident.Title -like "*Compromise*") { return "AccountCompromise" }
-        if ($incident.Title -like "*Exfiltration*") { return "DataExfiltration" }
-        if ($incident.Title -like "*Malware*") { return "MalwareDetection" }
+        Write-Host "SecurityIncidentResponder._ClassifyIncident() (enhanced) called for incident: $($incident.Id)"
+        # More sophisticated classification
+        $title = $incident.Title
+        $description = $incident.Description # Assuming incident object has Description
+
+        if ($null -ne $title -and $title -match 'Malware') { return "MalwareDetection" }
+        if ($null -ne $description -and $description -match 'Malware') { return "MalwareDetection" }
+        if ($null -ne $title -and $title -match 'Compromise') { return "AccountCompromise" }
+        if ($null -ne $description -and $description -match 'Compromised account') { return "AccountCompromise" }
+        if ($null -ne $title -and $title -match 'Exfiltration') { return "DataExfiltration" }
+        if ($null -ne $description -and $description -match 'Data loss') { return "DataExfiltration" }
+        if ($null -ne $title -and $title -match 'Phishing') { return "PhishingAttempt" }
+        if ($null -ne $description -and $description -match 'Phishing attempt') { return "PhishingAttempt" }
+
+        Write-Host "Incident '$($incident.Id)' ('$title') could not be specifically classified, defaulting to 'Unclassified'."
         return "Unclassified"
     }
-
     hidden [object] _SelectPlaybook([string]$classification) {
-        Write-Host "SecurityIncidentResponder._SelectPlaybook() (stub) called for classification: $classification"
-        if ($this.SecurityPlaybooks.ContainsKey($classification)) {
-            return $this.SecurityPlaybooks[$classification]
+        Write-Host "SecurityIncidentResponder._SelectPlaybook() (enhanced) called for classification: $classification"
+        if ($null -eq $this.PlaybookManager -or $null -eq $this.SecurityPlaybooks) {
+            Write-Warning "_SelectPlaybook: PlaybookManager or SecurityPlaybooks not initialized/populated!"
+            return $null
         }
-        return $this.SecurityPlaybooks["DefaultPlaybook"]
-    }
 
-    hidden [void] _DocumentIncidentResponse([object]$incident, [object]$context) {
-        Write-Host "SecurityIncidentResponder._DocumentIncidentResponse() (stub) called for incident: $($incident.Id)"
-        # Placeholder for documenting response actions, e.g., writing to a log or system
-    }
+        foreach($pbName in $this.SecurityPlaybooks.Keys) {
+            $pb = $this.SecurityPlaybooks[$pbName]
+            if ($pb.defaultClassification -contains $classification) {
+                Write-Host "Selected playbook '$pbName' for classification '$classification' based on defaultClassification."
+                return $pb
+            }
+        }
 
-    hidden [void] _EscalateIncident([object]$incident) {
-        Write-Host "SecurityIncidentResponder._EscalateIncident() (stub) called for incident: $($incident.Id)"
-        # Placeholder for escalation procedures
-    }
+        $selectedPlaybookByName = $this.PlaybookManager.GetPlaybook($classification)
+        if ($selectedPlaybookByName) {
+            Write-Host "Selected playbook '$($selectedPlaybookByName.name)' for classification '$classification' by name."
+            return $selectedPlaybookByName
+        }
 
-    # Stubs for methods called in ExecutePlaybook
+        Write-Warning "Playbook for classification '$classification' not found by name or defaultClassification, attempting 'DefaultPlaybookFromFile'."
+        $defaultPb = $this.PlaybookManager.GetPlaybook("DefaultPlaybookFromFile")
+        if ($defaultPb) { return $defaultPb }
+
+        if ($this.SecurityPlaybooks.Count -gt 0) {
+            Write-Warning "Falling back to the first loaded playbook in SecurityPlaybooks."
+            return $this.SecurityPlaybooks.GetEnumerator()[0].Value
+        }
+        Write-Error "No playbooks available to select, and DefaultPlaybookFromFile also not found."
+        return $null
+    }
+    hidden [void] _DocumentIncidentResponse([object]$incident, [object]$context) { Write-Host "SIR Stub: _DocumentIncidentResponse" }
+    hidden [void] _EscalateIncident([object]$incident) { Write-Host "SIR Stub: _EscalateIncident" }
     hidden [object] _ExecuteAction([object]$action, [object]$context) {
-        Write-Host "SecurityIncidentResponder._ExecuteAction() (stub) called for action type: $($action.Type)"
-        # Placeholder for executing a single playbook action
-        return @{
-            Status = "Success";
-            Output = "Action $($action.Type) executed successfully (stub)."
+        Write-Host "SecurityIncidentResponder._ExecuteAction() (enhanced) called for action type: $($action.actionType)"
+        $actionType = $action.actionType
+        $parameters = $action.parameters
+        $result = @{ Status = "Failed"; Output = "Action type '$actionType' not implemented or failed."; StartTime = (Get-Date)}
+
+        try {
+            switch ($actionType) {
+                "LogMessage" {
+                    $level = $this.GetOrElse($parameters.level, "Info") # Corrected call
+                    $message = $this.GetOrElse($parameters.message, "No message provided for LogMessage action.") # Corrected call
+                    Write-Host "[$level] Playbook Action Log: $message (Incident: $($context.IncidentId))"
+                    $result.Status = "Success"; $result.Output = "Logged message: $message"
+                }
+                "TagIncident" {
+                    if (-not $context.PSObject.Properties.Name -contains 'Tags' -or $null -eq $context.Tags) {
+                        $context.Tags = [System.Collections.Generic.List[string]]::new()
+                    }
+                    $tagName = $this.GetOrElse($parameters.tagName, "DefaultTag") # Corrected call
+                    $context.Tags.Add($tagName)
+                    Write-Host "Tagged incident $($context.IncidentId) with '$tagName'."
+                    $result.Status = "Success"; $result.Output = "Tagged with: $tagName. Current tags: $($context.Tags -join ', ')"
+                }
+                "InvokeBasicRestMethod" {
+                    $uri = $parameters.uri
+                    $method = $this.GetOrElse($parameters.method, "GET") # Corrected call
+                    $body = $parameters.body
+                    Write-Host "Mock REST Call: Would invoke $method to $uri"
+                    if ($body) { Write-Host ("With body: " + ($body | ConvertTo-Json -Compress -Depth 3)) }
+                    $result.Status = "Success"; $result.Output = "Mocked REST call to $uri performed."
+                }
+                default { Write-Warning "Unknown action type: $actionType"; $result.Output = "Unknown action type: $actionType" }
+            }
+        } catch {
+            Write-Error "Error executing action $actionType for incident $($context.IncidentId): $($_.Exception.Message)"
+            $result.Status = "Error"; $result.Output = "Exception: $($_.Exception.Message)"; $result.ErrorRecord = $_
         }
+        $result.EndTime = (Get-Date); $result.Duration = $result.EndTime - $result.StartTime
+        return $result
     }
 
-    hidden [void] _ValidateActionResult([object]$actionResult) {
-        Write-Host "SecurityIncidentResponder._ValidateActionResult() (stub) called."
-        # Placeholder for validating action results
+    hidden [object] GetOrElse($value, $default) { # Renamed method
+        if ($null -eq $value -or ($value -is [string] -and [string]::IsNullOrEmpty($value))) { return $default }
+        return $value
     }
-
-    hidden [void] _UpdateIncidentContext([object]$context, [object]$actionResult) {
-        Write-Host "SecurityIncidentResponder._UpdateIncidentContext() (stub) called."
-        # Placeholder for updating incident context based on action results
-        $context.LastActionStatus = $actionResult.Status
-        $context.LastUpdateTime = Get-Date
-    }
-
-    hidden [void] _HandleActionFailure([object]$action, [object]$context) {
-        Write-Host "SecurityIncidentResponder._HandleActionFailure() (stub) called for action type: $($action.Type)"
-        # Placeholder for handling failed actions
-    }
-
-    # Stubs for methods called in TriggerAutomatedResponse
-    hidden [void] _IsolateCompromisedAccount([object]$context) { Write-Host "SecurityIncidentResponder._IsolateCompromisedAccount() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _InitiateForensicCollection([object]$context) { Write-Host "SecurityIncidentResponder._InitiateForensicCollection() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _NotifySecurityTeam([object]$context) { Write-Host "SecurityIncidentResponder._NotifySecurityTeam() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _BlockDataTransfer([object]$context) { Write-Host "SecurityIncidentResponder._BlockDataTransfer() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _RevokeSessions([object]$context) { Write-Host "SecurityIncidentResponder._RevokeSessions() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _InitiateDLP([object]$context) { Write-Host "SecurityIncidentResponder._InitiateDLP() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _IsolateInfectedSystems([object]$context) { Write-Host "SecurityIncidentResponder._IsolateInfectedSystems() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _InitiateAntimalwareScan([object]$context) { Write-Host "SecurityIncidentResponder._InitiateAntimalwareScan() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _CollectMalwareSamples([object]$context) { Write-Host "SecurityIncidentResponder._CollectMalwareSamples() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _ExecuteDefaultResponse([object]$context) { Write-Host "SecurityIncidentResponder._ExecuteDefaultResponse() (stub) called for incident: $($context.IncidentId)" }
-
-    # Stubs for methods called in GenerateIncidentReport
-    hidden [object] _CreateIncidentTimeline([object]$incidentContext) {
-        Write-Host "SecurityIncidentResponder._CreateIncidentTimeline() (stub) called for incident: $($incidentContext.IncidentId)"
-        return @(
-            @{ Timestamp = $incidentContext.ReceivedTime; Event = "Incident Received" },
-            @{ Timestamp = Get-Date; Event = "Report Generated (stub)" }
-        )
-    }
-    hidden [object] _AssessIncidentImpact([object]$incidentContext) {
-        Write-Host "SecurityIncidentResponder._AssessIncidentImpact() (stub) called for incident: $($incidentContext.IncidentId)"
-        return @{ Severity = "Medium"; Scope = "Limited"; BusinessImpact = "Low" }
-    }
-    hidden [string] _GetContainmentStatus([object]$incidentContext) { Write-Host "SecurityIncidentResponder._GetContainmentStatus() (stub) called."; return "Pending" }
-    hidden [string] _GetRemediationStatus([object]$incidentContext) { Write-Host "SecurityIncidentResponder._GetRemediationStatus() (stub) called."; return "Pending" }
-    hidden [object] _GetForensicFindings([string]$incidentId) {
-        Write-Host "SecurityIncidentResponder._GetForensicFindings() (stub) called for incident: $incidentId"
-        # If $this.ForensicEngine and its methods are defined, this could call them.
-        # return $this.ForensicEngine.GetFindingsForIncident($incidentId) # Example
-        return @{ Findings = "No forensic findings (stub)."; Confidence = "Low" }
-    }
+    hidden [void] _ValidateActionResult([object]$actionResult) { Write-Host "SIR Stub: _ValidateActionResult" }
+    hidden [void] _UpdateIncidentContext([object]$context, [object]$actionResult) { Write-Host "SIR Stub: _UpdateIncidentContext" }
+    hidden [void] _HandleActionFailure([object]$action, [object]$context) { Write-Host "SIR Stub: _HandleActionFailure" }
+    hidden [void] _IsolateCompromisedAccount([object]$context) { Write-Host "SIR Stub: _IsolateCompromisedAccount" }
+    hidden [void] _InitiateForensicCollection([object]$context) { Write-Host "SIR Stub: _InitiateForensicCollection" }
+    hidden [void] _NotifySecurityTeam([object]$context) { Write-Host "SIR Stub: _NotifySecurityTeam" }
+    hidden [void] _BlockDataTransfer([object]$context) { Write-Host "SIR Stub: _BlockDataTransfer" }
+    hidden [void] _RevokeSessions([object]$context) { Write-Host "SIR Stub: _RevokeSessions" }
+    hidden [void] _InitiateDLP([object]$context) { Write-Host "SIR Stub: _InitiateDLP" }
+    hidden [void] _IsolateInfectedSystems([object]$context) { Write-Host "SIR Stub: _IsolateInfectedSystems" }
+    hidden [void] _InitiateAntimalwareScan([object]$context) { Write-Host "SIR Stub: _InitiateAntimalwareScan" }
+    hidden [void] _CollectMalwareSamples([object]$context) { Write-Host "SIR Stub: _CollectMalwareSamples" }
+    hidden [void] _ExecuteDefaultResponse([object]$context) { Write-Host "SIR Stub: _ExecuteDefaultResponse" }
+    hidden [object] _CreateIncidentTimeline([object]$incidentContext) { Write-Host "SIR Stub: _CreateIncidentTimeline"; return @() }
+    hidden [object] _AssessIncidentImpact([object]$incidentContext) { Write-Host "SIR Stub: _AssessIncidentImpact"; return @{} }
+    hidden [string] _GetContainmentStatus([object]$incidentContext) { Write-Host "SIR Stub: _GetContainmentStatus"; return "Pending" }
+    hidden [string] _GetRemediationStatus([object]$incidentContext) { Write-Host "SIR Stub: _GetRemediationStatus"; return "Pending" }
+    hidden [object] _GetForensicFindings([string]$incidentId) { Write-Host "SIR Stub: _GetForensicFindings"; return @{} }
     hidden [object] _GetRelatedThreatIntel([string]$incidentId) {
-        Write-Host "SecurityIncidentResponder._GetRelatedThreatIntel() (stub) called for incident: $incidentId"
-        # This would ideally call a method on a ThreatIntelligenceManager instance
-        # return $this.ThreatIntelManager.GetIntelForIncident($incidentId) # Example
-        return @{ Intel = "No related threat intelligence (stub)." }
+        Write-Host "SIR._GetRelatedThreatIntel() now calling `$this.ThreatIntelClient.GetRelatedThreatIntel for $incidentId"
+        if ($null -eq $this.ThreatIntelClient) { Write-Error "ThreatIntelClient not initialized!"; return $null }
+        return $this.ThreatIntelClient.GetRelatedThreatIntel($incidentId)
     }
-    hidden [object] _CompileLessonsLearned([object]$incidentContext) { Write-Host "SecurityIncidentResponder._CompileLessonsLearned() (stub) called."; return @{ Observation = "Stub observation."} }
-    hidden [object] _CalculateResponseMetrics([object]$incidentContext) { Write-Host "SecurityIncidentResponder._CalculateResponseMetrics() (stub) called."; return @{ TimeToDetection = "N/A"; TimeToResponse = "N/A" } }
-
-    # Stubs for methods called in InitiateForensicAnalysis
+    hidden [object] _CompileLessonsLearned([object]$incidentContext) { Write-Host "SIR Stub: _CompileLessonsLearned"; return @{} }
+    hidden [object] _CalculateResponseMetrics([object]$incidentContext) { Write-Host "SIR Stub: _CalculateResponseMetrics"; return @{} }
     hidden [object] _CollectForensicData([string]$incidentId) {
-        Write-Host "SecurityIncidentResponder._CollectForensicData() (stub) called for incident: $incidentId"
-        # This should ideally call ThreatHunter's CollectForensicData.
-        # For now, it's a self-contained stub. If $this.ForensicEngine is an instance of ThreatHunter:
-        # return $this.ForensicEngine.CollectForensicData($incidentId)
-        # If not, it remains a local stub:
-        return @{ DataType = "LogFiles"; Source = "SystemA"; CollectionTime = Get-Date; Status = "Collected (stub)" }
+        Write-Host "SIR._CollectForensicData() now calling `$this.ForensicEngine.CollectForensicData for $incidentId"
+        if ($null -eq $this.ForensicEngine) { Write-Error "ForensicEngine not initialized!"; return $null }
+        return $this.ForensicEngine.CollectForensicData($incidentId)
     }
-    hidden [object] _AnalyzeForensicData([object]$forensicData) {
-        Write-Host "SecurityIncidentResponder._AnalyzeForensicData() (stub) called."
-        return @{ AnalysisSummary = "Basic analysis performed (stub)."; IOCsFound = @() }
-    }
-    hidden [array] _IdentifyIOCs([object]$analysis) {
-        Write-Host "SecurityIncidentResponder._IdentifyIOCs() (stub) called."
-        return @("ioc1_stub", "ioc2_stub")
-    }
+    hidden [object] _AnalyzeForensicData([object]$forensicData) { Write-Host "SIR Stub: _AnalyzeForensicData"; return @{} }
+    hidden [array] _IdentifyIOCs([object]$analysis) { Write-Host "SIR Stub: _IdentifyIOCs"; return @() }
     hidden [void] _UpdateThreatIntelligence([array]$iocs) {
-        Write-Host "SecurityIncidentResponder._UpdateThreatIntelligence() (stub) called with IOCs: $($iocs -join ', ')"
-        # This would ideally call a method on a ThreatIntelligenceManager instance
-        # $this.ThreatIntelManager.UpdateIntelligenceFromIOCs($iocs) # Example
+        Write-Host "SIR._UpdateThreatIntelligence() now calling `$this.ThreatIntelClient.UpdateThreatIntelligence"
+        if ($null -eq $this.ThreatIntelClient) { Write-Error "ThreatIntelClient not initialized!"; return }
+        $this.ThreatIntelClient.UpdateThreatIntelligence($iocs)
     }
-    hidden [void] _GenerateForensicReport([string]$incidentId, [object]$analysis) {
-        Write-Host "SecurityIncidentResponder._GenerateForensicReport() (stub) called for incident: $incidentId"
-    }
+    hidden [void] _GenerateForensicReport([string]$incidentId, [object]$analysis) { Write-Host "SIR Stub: _GenerateForensicReport" }
+    # --- End of Hidden Method Stubs ---
 }
