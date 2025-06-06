@@ -33,15 +33,15 @@ class ComplianceMonitor {
 
     [hashtable]EvaluateFramework([string]$framework) {
         $rules = $this.ComplianceFrameworks[$framework]
-        $violations = @()
-        $recommendations = @()
+        $_violations = @() # Renamed local variable
+        $_recommendations = @() # Renamed local variable
 
         foreach ($rule in $rules) {
             try {
                 $ruleResult = $this.EvaluateRule($rule)
                 if (-not $ruleResult.Compliant) {
-                    $violations += $ruleResult.Violation
-                    $recommendations += $ruleResult.Recommendation
+                    $_violations += $ruleResult.Violation
+                    $_recommendations += $ruleResult.Recommendation
                 }
             }
             catch {
@@ -51,9 +51,9 @@ class ComplianceMonitor {
         }
 
         return @{
-            Compliant = ($violations.Count -eq 0)
-            Violations = $violations
-            Recommendations = $recommendations
+            Compliant = ($_violations.Count -eq 0)
+            Violations = $_violations
+            Recommendations = $_recommendations
         }
     }
 

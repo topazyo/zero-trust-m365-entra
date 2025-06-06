@@ -1,0 +1,9 @@
+{
+    // Placeholder: Define a list of privileged user UPNs or Object IDs
+    // This file should be secured and ideally integrated with an identity management system (e.g., Entra ID PIM groups)
+    "privilegedUsers": [
+        "admin_user1@yourtenant.onmicrosoft.com",
+        "global_admin_group_object_id"
+    ],
+    "comments": "This is a placeholder file for privileged user definitions. Update and secure appropriately."
+}
