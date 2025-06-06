@@ -1,4 +1,8 @@
 class SecurityIncidentResponder {
+        hidden [ThreatHunter]$ForensicEngine
+        hidden [ResponseOrchestrator]$AutomationEngine # Using ResponseOrchestrator as AutomationEngine for now
+        hidden [PlaybookManager]$PlaybookManager
+        hidden [ThreatIntelligenceManager]$ThreatIntelClient
     [string]$TenantId
     [hashtable]$SecurityPlaybooks
     [System.Collections.Generic.Dictionary[string,object]]$ActiveIncidents
