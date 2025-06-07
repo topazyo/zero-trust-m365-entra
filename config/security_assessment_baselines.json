@@ -1,0 +1,14 @@
+{
+    "DefaultSystemBaseline": {
+        "Description": "Default baseline for all systems (from file).",
+        "MinOsVersion": "Server2019",
+        "AutoUpdatesEnabled": true,
+        "EndpointProtectionConfigured": true
+    },
+    "WebAppBaseline_External": {
+        "Description": "Baseline for external web applications (from file).",
+        "HttpsOnly": true,
+        "WAFEnabled": true,
+        "StrictContentSecurityPolicy": true
+    }
+}

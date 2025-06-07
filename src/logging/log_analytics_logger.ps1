@@ -1,9 +1,9 @@
-class AuditManager {
+class LogAnalyticsLogger {
     [string]$WorkspaceId
     [string]$LogRetentionDays
     hidden [object]$LogAnalyticsConnection
 
-    AuditManager([string]$workspaceId, [int]$retentionDays = 365) {
+    LogAnalyticsLogger([string]$workspaceId, [int]$retentionDays = 365) {
         $this.WorkspaceId = $workspaceId
         $this.LogRetentionDays = $retentionDays
         $this.InitializeLogging()

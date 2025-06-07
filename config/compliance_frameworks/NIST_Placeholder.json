@@ -1,0 +1,18 @@
+[
+    {
+        "RuleId": "NIST.AC-1",
+        "Description": "Ensure Access Control Policy and Procedures are documented and implemented.",
+        "CheckType": "Documentation",
+        "Severity": "High",
+        "CurrentCheckValue_Placeholder": "PolicyOutdated",
+        "ExpectedValue_Placeholder": "PolicyReviewedAndCurrent"
+    },
+    {
+        "RuleId": "NIST.AU-2",
+        "Description": "Ensure audit logs are captured for all system components.",
+        "CheckType": "Logging",
+        "Severity": "Medium",
+        "CurrentCheckValue_Placeholder": "CoreComponentsOnly",
+        "ExpectedValue_Placeholder": "AllComponentsLogged"
+    }
+]

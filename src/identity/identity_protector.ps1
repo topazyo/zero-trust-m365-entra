@@ -4,7 +4,7 @@ class IdentityProtector {
     [System.Collections.Generic.Dictionary[string,object]]$RiskProfiles # Renamed from IdentityStates for clarity, focusing on Risk
     hidden [object]$ProtectionEngine # Kept from IdentityProtector for potential modularity
 
-    ComprehensiveIdentityProtector([string]$tenantId) {
+    IdentityProtector([string]$tenantId) {
         $this.TenantId = $tenantId
         $this.LoadProtectionPolicies() # Keeping LoadProtectionPolicies - assumed common functionality
         $this.InitializeProtectionEngine() # Kept from IdentityProtector - hints at modularity

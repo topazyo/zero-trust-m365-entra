@@ -1,0 +1,10 @@
+[
+    {
+        "RuleId": "PCI3.4",
+        "Description": "Render PAN unreadable anywhere it is stored.",
+        "CheckType": "DataProtection",
+        "Severity": "Critical",
+        "CurrentCheckValue_Placeholder": "PAN_VisibleInTestDB",
+        "ExpectedValue_Placeholder": "PAN_MaskedOrEncrypted"
+    }
+]

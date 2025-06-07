@@ -77,7 +77,9 @@ class SecurityIncidentResponder {
                 }
             }
             catch {
-                $this._HandleActionFailure($step, $context)
+                # Pass the step, context, and the exception details to _HandleActionFailure
+                $this._HandleActionFailure($step, $context, $_.Exception)
+
                 $context.Actions.Add(@{ # Use .Add() for List
                     StepId = $step.id
                     Name = $step.name
@@ -160,7 +162,7 @@ class SecurityIncidentResponder {
     hidden [void] _LoadSecurityPlaybooks() {
         Write-Host "SecurityIncidentResponder._LoadSecurityPlaybooks() (enhanced) called."
         if ($null -eq $this.PlaybookManager) { Write-Warning "_LoadSecurityPlaybooks: PlaybookManager not initialized!"; return }
-        $this.PlaybookManager.LoadPlaybooks("./playbooks"); $this.SecurityPlaybooks = $this.PlaybookManager.LoadedPlaybooks
+        $this.PlaybookManager.LoadPlaybooks("../../playbooks"); $this.SecurityPlaybooks = $this.PlaybookManager.LoadedPlaybooks
         Write-Host "Playbooks loaded via PlaybookManager. Total playbooks: $($this.SecurityPlaybooks.Count)"
     }
 
@@ -192,7 +194,7 @@ class SecurityIncidentResponder {
 
     hidden [object] _ExecuteAction([object]$action, [object]$context) {
         Write-Host "SecurityIncidentResponder._ExecuteAction() (Corrected for RunPSScript & Logging) called for action type: $($action.actionType)"
-        Write-Host ""Context received by _ExecuteAction (IncidentId: '', Keys: ' )"" # More detailed log
+        Write-Host "Context received by _ExecuteAction (IncidentId: '', Keys: ' ')" # More detailed log
         $actionType = $action.actionType
         $parameters = $action.parameters
         $result = @{ Status = "Failed"; Output = "Action type '$actionType' not implemented or failed."; StartTime = (Get-Date)}
@@ -322,28 +324,212 @@ class SecurityIncidentResponder {
         return $this.ThreatIntelClient.GetRelatedThreatIntel($incidentId)
     }
 
-    hidden [object] _CreateIncidentContext([object]$incident) {
-        Write-Host "SecurityIncidentResponder._CreateIncidentContext() (stub) called for incident: $($incident.Id)"
-        return @{ IncidentId = $incident.Id; ReceivedTime = Get-Date; Status = "New"; Classification = "Pending"; InitialSeverity = $incident.Severity; AssociatedEntities = @(); RawIncident = $incident; Tags = ([System.Collections.Generic.List[string]]::new()); Actions = ([System.Collections.Generic.List[object]]::new()) }
+    hidden [pscustomobject] _CreateIncidentContext([object]$incident) {
+        Write-Host "SecurityIncidentResponder._CreateIncidentContext() called for incident: $($incident.Id)"
+        $context = [PSCustomObject]@{
+            IncidentId          = $incident.Id
+            TenantId            = $this.TenantId # Assuming $this.TenantId is set in constructor
+            ReceivedTime        = Get-Date
+            LastUpdateTime      = Get-Date
+            Status              = "New" # e.g., New, Active, Contained, Eradicated, Recovered, Closed
+            Classification      = "Pending" # e.g., MalwareDetection, AccountCompromise, PhishingAttempt, etc.
+            InitialSeverity     = if ($null -ne $incident.Severity) { $incident.Severity } else { "Unknown" } # Handle null severity
+            CurrentSeverity     = if ($null -ne $incident.Severity) { $incident.Severity } else { "Unknown" } # Handle null severity
+            AssociatedEntities  = [System.Collections.Generic.List[string]]::new()
+            Tags                = [System.Collections.Generic.List[string]]::new()
+            Actions             = [System.Collections.Generic.List[object]]::new() # To store action results
+            PlaybookExecution   = @{
+                CurrentPlaybookName = $null
+                CurrentStepName     = $null
+                Status              = "NotStarted" # e.g., NotStarted, InProgress, Completed, Failed
+            }
+            ForensicData        = $null
+            ThreatIntel         = $null
+            Notes               = [System.Collections.Generic.List[string]]::new()
+            RawIncident         = $incident # The original incident object
+        }
+
+        # Potentially add some initial entities if available in $incident (example properties)
+        if ($incident.PSObject.Properties.Name -contains 'AffectedUser' -and $null -ne $incident.AffectedUser) {
+            $context.AssociatedEntities.Add("User:$($incident.AffectedUser)")
+        }
+        if ($incident.PSObject.Properties.Name -contains 'AffectedDevice' -and $null -ne $incident.AffectedDevice) {
+            $context.AssociatedEntities.Add("Device:$($incident.AffectedDevice)")
+        }
+
+        return $context
     }
     hidden [void] _DocumentIncidentResponse([object]$incident, [object]$context) { Write-Host "SecurityIncidentResponder._DocumentIncidentResponse() (stub) called for incident: $($incident.Id)" }
     hidden [void] _EscalateIncident([object]$incident) { Write-Host "SecurityIncidentResponder._EscalateIncident() (stub) called for incident: $($incident.Id)" }
-    hidden [void] _ValidateActionResult([object]$actionResult) { Write-Host "SecurityIncidentResponder._ValidateActionResult() (stub) called." }
-    hidden [void] _UpdateIncidentContext([object]$context, [object]$actionResult) {
-        Write-Host "SecurityIncidentResponder._UpdateIncidentContext() (stub) called."
-        $context.LastActionStatus = $actionResult.Status; $context.LastUpdateTime = Get-Date
+    hidden [void] _ValidateActionResult([object]$actionResult) {
+        Write-Host "SecurityIncidentResponder._ValidateActionResult called for action result (Status: $($actionResult.Status))"
+        if ($null -eq $actionResult) {
+            Write-Warning "_ValidateActionResult: Action result is null."
+            # Consider throwing an error if actionResult being null is unacceptable
+            # throw "Action result cannot be null in _ValidateActionResult"
+            return
+        }
+        if (-not $actionResult.PSObject.Properties.Name -contains 'Status') {
+            Write-Warning "_ValidateActionResult: Action result is missing 'Status' property."
+            # Consider throwing an error if Status is mandatory
+            # throw "Action result must have a 'Status' property in _ValidateActionResult"
+        }
+        # Example: Log the full result for debugging if it's complex
+        # if ($actionResult.PSObject.Properties.Count -gt 3) { # Arbitrary condition
+        #    Write-Verbose "_ValidateActionResult: Detailed action result: $($actionResult | ConvertTo-Json -Depth 2 -Compress)"
+        # }
     }
-    hidden [void] _HandleActionFailure([object]$action, [object]$context) { Write-Host "SecurityIncidentResponder._HandleActionFailure() (stub) called for action type: $($action.actionType)" }
-    hidden [void] _IsolateCompromisedAccount([object]$context) { Write-Host "SecurityIncidentResponder._IsolateCompromisedAccount() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _InitiateForensicCollection([object]$context) { Write-Host "SecurityIncidentResponder._InitiateForensicCollection() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _NotifySecurityTeam([object]$context) { Write-Host "SecurityIncidentResponder._NotifySecurityTeam() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _BlockDataTransfer([object]$context) { Write-Host "SecurityIncidentResponder._BlockDataTransfer() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _RevokeSessions([object]$context) { Write-Host "SecurityIncidentResponder._RevokeSessions() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _InitiateDLP([object]$context) { Write-Host "SecurityIncidentResponder._InitiateDLP() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _IsolateInfectedSystems([object]$context) { Write-Host "SecurityIncidentResponder._IsolateInfectedSystems() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _InitiateAntimalwareScan([object]$context) { Write-Host "SecurityIncidentResponder._InitiateAntimalwareScan() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _CollectMalwareSamples([object]$context) { Write-Host "SecurityIncidentResponder._CollectMalwareSamples() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _ExecuteDefaultResponse([object]$context) { Write-Host "SecurityIncidentResponder._ExecuteDefaultResponse() (stub) called for incident: $($context.IncidentId)" }
+    hidden [void] _UpdateIncidentContext([object]$context, [object]$actionResult) {
+        Write-Host "SecurityIncidentResponder._UpdateIncidentContext called. Action Status: $($actionResult.Status), Action Name: $($actionResult.Name)"
+        $context.LastActionStatus = $actionResult.Status
+        $context.LastUpdateTime = Get-Date
+
+        # Add a note about the action taken
+        $actionNote = "Action '$($actionResult.Name)' (Type: $($actionResult.Type)) completed with status: $($actionResult.Status)."
+        if ($actionResult.PSObject.Properties.Name -contains 'Output' -and $null -ne $actionResult.Output) {
+            $actionNote += " Output: $($actionResult.Output | Out-String)"
+        }
+        $context.Notes.Add((Get-Date).ToString("u") + " - " + $actionNote)
+
+
+        if ($actionResult.Status -ne "Success" -and $actionResult.Status -ne "SucceededWithInfo") { # Or other considered success states
+            $context.PlaybookExecution.Status = "FailedAtStep" # More specific status for playbook
+            $context.Status = "NeedsAttention" # Overall incident status
+        }
+        # If action was successful, and it was the last step of a playbook, update playbook status
+        # This requires knowing if it's the last step - logic for this would be in ExecutePlaybook
+    }
+    hidden [void] _HandleActionFailure([object]$action, [object]$context, [object]$exceptionDetails) {
+        $errorMessage = "ERROR during action '$($action.name)' (Type: $($action.actionType)): $($exceptionDetails.Message)"
+        Write-Error $errorMessage
+
+        if ($null -ne $context) {
+            $noteTimestamp = (Get-Date).ToString("u")
+            $context.Notes.Add("$noteTimestamp - FAILURE: $errorMessage")
+            $context.Status = "ErrorInPlaybook" # Overall incident status
+            if ($null -ne $context.PlaybookExecution) {
+                $context.PlaybookExecution.Status = "Failed"
+                 if ($null -ne $action -and $action.PSObject.Properties.Name -contains 'name') {
+                     $context.PlaybookExecution.CurrentStepName = $action.name
+                 }
+            }
+            $context.LastUpdateTime = Get-Date
+        }
+        # Future enhancement: Trigger an escalation or specific alert
+        # Example: $this._EscalateIncident($context.RawIncident, "PlaybookActionFailure: $($action.name)")
+    }
+    hidden [void] _IsolateCompromisedAccount([object]$context) {
+        $incidentId = if ($null -ne $context -and $context.PSObject.Properties.Name -contains 'IncidentId') { $context.IncidentId } else { "UnknownIncident" }
+        Write-Host "SecurityIncidentResponder._IsolateCompromisedAccount called for incident: $incidentId"
+        # TODO: Add logic to call $this.AutomationEngine to perform account isolation (e.g., disable account, revoke sessions)
+        # Example: $this.AutomationEngine.DisableUserAccount($context.AffectedUser)
+        if ($null -ne $context) {
+            $context.Notes.Add("Attempted to isolate compromised account (simulated). Affected entities: $($context.AssociatedEntities -join ', ')")
+            $context.Status = "ContainmentInProgress_AccountIsolation"
+            $context.LastUpdateTime = Get-Date
+        }
+        Write-Warning "Placeholder: Account isolation for $incidentId would be performed here via ResponseOrchestrator."
+    }
+    hidden [void] _InitiateForensicCollection([object]$context) {
+        $incidentId = if ($null -ne $context -and $context.PSObject.Properties.Name -contains 'IncidentId') { $context.IncidentId } else { "UnknownIncident" }
+        Write-Host "SecurityIncidentResponder._InitiateForensicCollection (SIR internal) called for incident: $incidentId"
+        # This is distinct from $this._CollectForensicData which calls ThreatHunter.
+        # This method might coordinate multiple types of collections or use ResponseOrchestrator.
+        # For now, it's a placeholder for such coordination.
+        if ($null -ne $context) {
+            $context.Notes.Add("Forensic collection initiated (simulated via SIR placeholder).")
+            $context.LastUpdateTime = Get-Date
+        }
+        Write-Warning "Placeholder: Coordinated forensic data collection for $incidentId would be managed here."
+        # Example: Potentially call specific collection tasks via $this.AutomationEngine or $this.ForensicEngine for different artifacts
+        # $this.AutomationEngine.CollectProcessListing($context.AffectedDevice)
+        # $this.ForensicEngine.CollectFullDiskImage($context.AffectedDevice) # If different from standard collection
+    }
+    hidden [void] _NotifySecurityTeam([object]$context) {
+        $incidentId = if ($null -ne $context -and $context.PSObject.Properties.Name -contains 'IncidentId') { $context.IncidentId } else { "UnknownIncident" }
+        Write-Host "SecurityIncidentResponder._NotifySecurityTeam called for incident: $incidentId"
+        # TODO: Add logic to call $this.AutomationEngine or a notification service.
+        # Example: $this.AutomationEngine.SendNotification(Subject="Security Alert: Incident $incidentId", Body="Details: ...", Recipients=@("soc@example.com"))
+        if ($null -ne $context) {
+            $notificationMessage = "Security team notified (simulated) for incident $incidentId. Classification: $($context.Classification), Severity: $($context.CurrentSeverity)."
+            $context.Notes.Add($notificationMessage)
+            $context.LastUpdateTime = Get-Date
+            Write-Host $notificationMessage
+        }
+        Write-Warning "Placeholder: Security team notification for $incidentId would be sent here."
+    }
+    hidden [void] _BlockDataTransfer([object]$context) {
+        $incidentId = if ($null -ne $context -and $context.PSObject.Properties.Name -contains 'IncidentId') { $context.IncidentId } else { "UnknownIncident" }
+        Write-Host "SecurityIncidentResponder._BlockDataTransfer called for incident: $incidentId"
+        # TODO: Integrate with network/DLP tools via AutomationEngine
+        if ($null -ne $context) {
+            $context.Notes.Add("Attempted to block data transfer (simulated).")
+            $context.Status = "ContainmentInProgress_DataTransferBlock"
+            $context.LastUpdateTime = Get-Date
+        }
+        Write-Warning "Placeholder: Data transfer blocking for $incidentId would be performed here."
+    }
+    hidden [void] _RevokeSessions([object]$context) {
+        $incidentId = if ($null -ne $context -and $context.PSObject.Properties.Name -contains 'IncidentId') { $context.IncidentId } else { "UnknownIncident" }
+        Write-Host "SecurityIncidentResponder._RevokeSessions called for incident: $incidentId"
+        # TODO: Integrate with identity/session management tools via AutomationEngine
+        if ($null -ne $context) {
+            $context.Notes.Add("Attempted to revoke user sessions (simulated). Affected entities: $($context.AssociatedEntities -join ', ')")
+            $context.Status = "ContainmentInProgress_SessionRevocation"
+            $context.LastUpdateTime = Get-Date
+        }
+        Write-Warning "Placeholder: Session revocation for $incidentId would be performed here."
+    }
+    hidden [void] _InitiateDLP([object]$context) {
+        $incidentId = if ($null -ne $context -and $context.PSObject.Properties.Name -contains 'IncidentId') { $context.IncidentId } else { "UnknownIncident" }
+        Write-Host "SecurityIncidentResponder._InitiateDLP called for incident: $incidentId"
+        # TODO: Integrate with DLP systems via AutomationEngine
+        if ($null -ne $context) {
+            $context.Notes.Add("DLP policy review and enforcement initiated (simulated).")
+            $context.LastUpdateTime = Get-Date
+        }
+        Write-Warning "Placeholder: DLP actions for $incidentId would be performed here."
+    }
+    hidden [void] _IsolateInfectedSystems([object]$context) {
+        $incidentId = if ($null -ne $context -and $context.PSObject.Properties.Name -contains 'IncidentId') { $context.IncidentId } else { "UnknownIncident" }
+        Write-Host "SecurityIncidentResponder._IsolateInfectedSystems called for incident: $incidentId"
+        # TODO: Integrate with endpoint management/network tools via AutomationEngine
+        if ($null -ne $context) {
+            $context.Notes.Add("Attempted to isolate infected systems (simulated). Affected entities: $($context.AssociatedEntities -join ', ')")
+            $context.Status = "ContainmentInProgress_SystemIsolation"
+            $context.LastUpdateTime = Get-Date
+        }
+        Write-Warning "Placeholder: System isolation for $incidentId would be performed here."
+    }
+    hidden [void] _InitiateAntimalwareScan([object]$context) {
+        $incidentId = if ($null -ne $context -and $context.PSObject.Properties.Name -contains 'IncidentId') { $context.IncidentId } else { "UnknownIncident" }
+        Write-Host "SecurityIncidentResponder._InitiateAntimalwareScan called for incident: $incidentId"
+        # TODO: Integrate with endpoint security tools via AutomationEngine
+        if ($null -ne $context) {
+            $context.Notes.Add("Antimalware scan initiated on affected systems (simulated).")
+            $context.LastUpdateTime = Get-Date
+        }
+        Write-Warning "Placeholder: Antimalware scan for $incidentId would be initiated here."
+    }
+    hidden [void] _CollectMalwareSamples([object]$context) {
+        $incidentId = if ($null -ne $context -and $context.PSObject.Properties.Name -contains 'IncidentId') { $context.IncidentId } else { "UnknownIncident" }
+        Write-Host "SecurityIncidentResponder._CollectMalwareSamples called for incident: $incidentId"
+        # TODO: Integrate with endpoint security tools for sample submission via AutomationEngine
+        if ($null -ne $context) {
+            $context.Notes.Add("Malware sample collection initiated (simulated).")
+            $context.LastUpdateTime = Get-Date
+        }
+        Write-Warning "Placeholder: Malware sample collection for $incidentId would be initiated here."
+    }
+    hidden [void] _ExecuteDefaultResponse([object]$context) {
+        $incidentId = if ($null -ne $context -and $context.PSObject.Properties.Name -contains 'IncidentId') { $context.IncidentId } else { "UnknownIncident" }
+        Write-Host "SecurityIncidentResponder._ExecuteDefaultResponse called for incident: $incidentId (Classification: $($context.Classification))"
+        if ($null -ne $context) {
+            $context.Notes.Add("Executed default response action (simulated) as no specific trigger matched.")
+            $context.LastUpdateTime = Get-Date
+        }
+        Write-Warning "Placeholder: Default response actions for $incidentId would be performed here."
+    }
     hidden [object] _CreateIncidentTimeline([object]$incidentContext) {
         Write-Host "SecurityIncidentResponder._CreateIncidentTimeline() (stub) called for incident: $($incidentContext.IncidentId)"; return @( @{ Timestamp = $incidentContext.ReceivedTime; Event = "Incident Received" }, @{ Timestamp = Get-Date; Event = "Report Generated (stub)" } )
     }
@@ -354,9 +540,78 @@ class SecurityIncidentResponder {
         Write-Host "SecurityIncidentResponder._GetForensicFindings() (stub) called for incident: $incidentId"
         return @{ Findings = "No forensic findings (stub)."; Confidence = "Low" }
     }
-    hidden [object] _AnalyzeForensicData([object]$forensicData) { Write-Host "SecurityIncidentResponder._AnalyzeForensicData() (stub) called."; return @{ AnalysisSummary = "Basic analysis performed (stub)."; IOCsFound = @() } }
-    hidden [array] _IdentifyIOCs([object]$analysis) { Write-Host "SecurityIncidentResponder._IdentifyIOCs() (stub) called."; return @("ioc1_stub", "ioc2_stub") }
-    hidden [void] _GenerateForensicReport([string]$incidentId, [object]$analysis) { Write-Host "SecurityIncidentResponder._GenerateForensicReport() (stub) called for incident: $incidentId" }
+    hidden [object] _AnalyzeForensicData([object]$forensicData) {
+        Write-Host "SecurityIncidentResponder._AnalyzeForensicData called."
+        if ($null -eq $forensicData) {
+            Write-Warning "_AnalyzeForensicData: Input forensicData is null."
+            return @{ AnalysisSummary = "No data provided for analysis."; IOCsFound = @() }
+        }
+
+        $summary = "Forensic data analysis (simulated). "
+        $iocs = [System.Collections.Generic.List[string]]::new()
+
+        if ($forensicData.PSObject.Properties.Name -contains 'Processes') {
+            $summary += " $($forensicData.Processes.Count) processes reviewed."
+            foreach ($process in $forensicData.Processes) {
+                if ($null -ne $process.Name -and ($process.Name -like "evil.exe*" -or $process.Name -like "ransom.exe*")) {
+                    $iocs.Add("ProcessName:$($process.Name)")
+                    if ($null -ne $process.CommandLine) { $iocs.Add("ProcessCommandLine:$($process.CommandLine)") }
+                }
+            }
+        }
+        if ($forensicData.PSObject.Properties.Name -contains 'NetworkConnections') {
+            $summary += " $($forensicData.NetworkConnections.Count) network connections reviewed."
+             foreach ($conn in $forensicData.NetworkConnections) {
+                if ($null -ne $conn.DestinationIP -and $conn.DestinationIP -eq "3.3.3.3") { # Example from mock
+                    $iocs.Add("NetworkDestinationIP:$($conn.DestinationIP)")
+                }
+            }
+        }
+        if ($forensicData.PSObject.Properties.Name -contains 'Files') {
+            $summary += " $($forensicData.Files.Count) files reviewed."
+             foreach ($file in $forensicData.Files) {
+                if ($null -ne $file.Path -and $file.Path -like "*evil.exe") {
+                    $iocs.Add("FilePath:$($file.Path)")
+                    if ($null -ne $file.Hash) { $iocs.Add("FileHash:$($file.Hash)") }
+                }
+            }
+        }
+        $summary += " Identified $($iocs.Count) potential IOCs."
+        Write-Host $summary
+        return @{ AnalysisSummary = $summary; IOCsFound = $iocs }
+    }
+    hidden [array] _IdentifyIOCs([object]$analysis) {
+        Write-Host "SecurityIncidentResponder._IdentifyIOCs called."
+        if ($null -ne $analysis -and $analysis.PSObject.Properties.Name -contains 'IOCsFound') {
+            # Ensure it's an array, even if it's a List from _AnalyzeForensicData
+            return @($analysis.IOCsFound)
+        }
+        Write-Warning "_IdentifyIOCs: Analysis object did not contain 'IOCsFound' or was null."
+        return @()
+    }
+    hidden [void] _GenerateForensicReport([string]$incidentId, [object]$analysis) {
+        Write-Host "SecurityIncidentResponder._GenerateForensicReport for incident: $incidentId."
+        if ($null -eq $analysis) {
+            Write-Warning "_GenerateForensicReport: Analysis data is null. Cannot generate report."
+            return
+        }
+
+        $iocsString = if ($null -ne $analysis.IOCsFound) { $analysis.IOCsFound -join ', ' } else { "None" }
+
+        $reportText = @"
+Incident ID: $incidentId
+Analysis Summary: $($analysis.AnalysisSummary)
+Identified IOCs: $iocsString
+Report Generated: $(Get-Date)
+"@
+        Write-Host "--- Forensic Report Start ---"
+        Write-Host $reportText
+        Write-Host "--- Forensic Report End ---"
+        # Example: Add report to incident context notes
+        # if ($this.ActiveIncidents.ContainsKey($incidentId)) {
+        #    $this.ActiveIncidents[$incidentId].Notes.Add("Forensic Report Generated: $reportText")
+        # }
+    }
     hidden [object] _CompileLessonsLearned([object]$incidentContext) { Write-Host "SecurityIncidentResponder._CompileLessonsLearned() (stub) called."; return @{ Observation = "Stub observation."} }
     hidden [object] _CalculateResponseMetrics([object]$incidentContext) { Write-Host "SecurityIncidentResponder._CalculateResponseMetrics() (stub) called."; return @{ TimeToDetection = "N/A"; TimeToResponse = "N/A" } }
 }

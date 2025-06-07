@@ -1,0 +1,14 @@
+{
+    "SampleExternalPolicy": {
+        "Description": "A sample policy loaded from an external file.",
+        "QueryFilter": "EventType -eq 'FileAccess' -and User -ne 'system'",
+        "RetentionDays": 90,
+        "AlertEnabled": true
+    },
+    "AnotherExternalPolicy": {
+        "Description": "Another policy example.",
+        "QueryFilter": "Severity -eq 'Medium'",
+        "RetentionDays": 60,
+        "AlertEnabled": false
+    }
+}
