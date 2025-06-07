@@ -4,11 +4,14 @@
     "Az.Accounts": "2.15.1",
     "Az.Security": "1.5.0",
     "Pester": "5.5.0",
-    "Microsoft.Graph.Authentication": "2.14.0"
+    "Microsoft.Graph.Authentication": "2.14.0",
+    "Az.OperationalInsights": "3.2.0"
   },
   "ConnectionSettings": {
     "TenantId": "YOUR_TENANT_ID",
     "TenantId_HelpText": "This TenantId needs to be updated. Run Initialize-Environment.ps1 with the -TenantId parameter, set the AZURE_TENANT_ID environment variable, or edit this file manually.",
+    "LogAnalyticsWorkspaceId": "YOUR_LOG_ANALYTICS_WORKSPACE_ID",
+    "LogAnalyticsWorkspaceId_HelpText": "Update with your Azure Log Analytics Workspace ID (not the full resource ID, just the GUID-like Workspace ID). Used by ThreatHunter for querying logs.",
     "RequiredScopes": [
       "User.Read.All",
       "Group.ReadWrite.All",

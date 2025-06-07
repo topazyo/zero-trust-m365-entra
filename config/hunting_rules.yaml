@@ -1,0 +1,52 @@
+# Sample Hunting Rules for ThreatHunter
+#
+# Structure per rule:
+#   ruleName: Unique identifier for the rule (string, mandatory)
+#   description: A brief description of what the rule hunts for (string, mandatory)
+#   query: The actual query string (e.g., KQL for Azure Log Analytics) (string, mandatory)
+#   severity: Low | Medium | High | Critical (string, mandatory)
+#   mitreTactics: List of MITRE ATT&CK Tactic IDs (e.g., TA0001, TA0002) (list of strings, optional)
+#   targetEntities: List of entities this rule focuses on (e.g., User, Host, Process, IPAddress) (list of strings, optional)
+#   enabled: true | false (boolean, mandatory)
+#
+---
+- ruleName: "MultipleFailedLogonsForSingleUser"
+  description: "Detects multiple (more than 10) failed logon attempts for a single non-anonymous user within a specific timeframe (implicit in query)."
+  query: |
+    SecurityEvent
+    | where EventID == 4625 and TargetUserName != 'ANONYMOUS LOGON' and TargetUserName != '-' and TargetUserName !endswith '$'
+    | summarize FailureCount = count() by TargetUserName, Activity, IpAddress
+    | where FailureCount > 10
+  severity: "High"
+  mitreTactics:
+    - "TA0001"  # Initial Access
+    - "TA0006"  # Credential Access (attempted)
+  targetEntities:
+    - "User"
+    - "IPAddress"
+  enabled: true
+
+- ruleName: "RareProcessExecutionOnDomainController"
+  description: "Detects execution of processes rarely seen on domain controllers."
+  query: |
+    // Placeholder - requires baselining or specific process list
+    SecurityEvent
+    | where EventID == 4688 and Computer has 'DC01' // Example, needs better targeting
+    | summarize count() by ProcessName
+    | where ProcessName in ('ftp.exe', 'nc.exe', 'powershell_ise.exe') // Example rare processes
+  severity: "Medium"
+  mitreTactics:
+    - "TA0002"  # Execution
+  targetEntities:
+    - "Host"
+    - "Process"
+  enabled: true
+
+- ruleName: "DisabledExampleRule_AnySignInToAzurePortal"
+  description: "Example of a disabled rule: Detects any sign-in to the Azure Portal. (Too noisy for production without filtering)."
+  query: |
+    SigninLogs
+    | where AppDisplayName == "Azure Portal"
+    | project TimeGenerated, UserPrincipalName, IPAddress, Location
+  severity: "Informational"
+  enabled: false
