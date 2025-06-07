@@ -1,85 +1,115 @@
 Import-Module Pester -ErrorAction Stop
-Import-Module ../../src/playbook/PlaybookManager.ps1 -ErrorAction Stop
+. $PSScriptRoot/PlaybookManager.ps1 # Assuming tests are in the same dir as the script, or adjust path
 
 Describe "PlaybookManager Tests" {
+    $pm = $null
+    $testDir = Join-Path $PSScriptRoot "temp_playbooks_test_dir"
+
+    BeforeEach {
+        $pm = [PlaybookManager]::new()
+        if (Test-Path $testDir) {
+            Remove-Item -Path $testDir -Recurse -Force
+        }
+        New-Item -Path $testDir -ItemType Directory | Out-Null
+    }
+
+    AfterEach {
+        if (Test-Path $testDir) {
+            Remove-Item -Path $testDir -Recurse -Force
+        }
+    }
+
+    It "should instantiate correctly with an empty LoadedPlaybooks hashtable" {
+        $pm.LoadedPlaybooks | Should -Not -BeNull
+        $pm.LoadedPlaybooks | Should -BeOfType ([hashtable])
+        $pm.LoadedPlaybooks.Count | Should -Be 0
+    }
+
     Context "LoadPlaybooks Method" {
-        $mockPlaybookDir = "./temp_playbooks_test_pm"
-        BeforeEach {
-            # Ensure directory is clean and exists
-            if (Test-Path $mockPlaybookDir) {
-                Remove-Item -Path $mockPlaybookDir -Recurse -Force | Out-Null
-            }
-            New-Item -ItemType Directory -Path $mockPlaybookDir -Force | Out-Null
-        }
-        AfterEach {
-            if (Test-Path $mockPlaybookDir) {
-                Remove-Item -Path $mockPlaybookDir -Recurse -Force | Out-Null
-            }
-        }
+        It "should load valid JSON playbook files from a directory" {
+            Set-Content -Path (Join-Path $testDir "valid_pb1.json") -Value '{ "name": "TestPB1", "description": "Valid PB", "steps": [] }'
+            Set-Content -Path (Join-Path $testDir "valid_pb2.json") -Value '{ "name": "TestPB2", "description": "Another Valid PB", "defaultClassification": ["TestClass"], "steps": [{"id": "s1", "name": "step1", "actionType": "Log"}] }'
 
-        It "loads valid playbook JSON files" {
-            Set-Content -Path ($mockPlaybookDir + "/pb1.json") -Value '{ "name": "Playbook1", "steps": [] }'
-            Set-Content -Path ($mockPlaybookDir + "/pb2.json") -Value '{ "name": "Playbook2", "description": "Test Description" }'
-
-            $pm = New-Object PlaybookManager
-            $pm.LoadPlaybooks($mockPlaybookDir)
+            $pm.LoadPlaybooks($testDir)
 
             $pm.LoadedPlaybooks.Count | Should -Be 2
-            $pm.LoadedPlaybooks["Playbook1"] | Should -Not -BeNull
-            $pm.LoadedPlaybooks["Playbook1"].name | Should -Be "Playbook1"
-            $pm.LoadedPlaybooks["Playbook2"].description | Should -Be "Test Description"
+            $pm.LoadedPlaybooks["TestPB1"] | Should -Not -BeNull
+            $pm.LoadedPlaybooks["TestPB2"] | Should -Not -BeNull
+            $pm.LoadedPlaybooks["TestPB1"].name | Should -Be "TestPB1"
         }
 
-        It "handles missing directory" {
-            Remove-Item -Path $mockPlaybookDir -Recurse -Force # Ensure it's gone
-            $pm = New-Object PlaybookManager
-            # LoadPlaybooks should write an error but not throw terminating exception
-            $pm.LoadPlaybooks($mockPlaybookDir)
+        It "should correctly parse properties of loaded playbooks" {
+            Set-Content -Path (Join-Path $testDir "valid_pb2.json") -Value '{ "name": "TestPB2", "description": "Another Valid PB", "defaultClassification": ["TestClass"], "steps": [{"id": "s1", "name": "step1", "actionType": "Log"}] }'
+            $pm.LoadPlaybooks($testDir)
+            $pm.LoadedPlaybooks["TestPB2"].description | Should -Be "Another Valid PB"
+            $pm.LoadedPlaybooks["TestPB2"].defaultClassification | Should -BeOfType ([array])
+            $pm.LoadedPlaybooks["TestPB2"].defaultClassification[0] | Should -Be "TestClass"
+            $pm.LoadedPlaybooks["TestPB2"].steps[0].actionType | Should -Be "Log"
+        }
+
+        It "should handle non-existent directory gracefully with a Write-Error" {
+            Mock Write-Error {} -Verifiable
+            $nonExistentDir = Join-Path $testDir "non_existent_subdir"
+            $pm.LoadPlaybooks($nonExistentDir)
+            $pm.LoadedPlaybooks.Count | Should -Be 0
+            Should -Invoke Verifiable -CommandName Write-Error -Times 1 -Exactly
+        }
+
+        It "should handle directory with no JSON files" {
+            $pm.LoadPlaybooks($testDir) # Empty directory
             $pm.LoadedPlaybooks.Count | Should -Be 0
         }
 
-        It "handles invalid JSON" {
-            Set-Content -Path ($mockPlaybookDir + "/invalid.json") -Value '{ name: "InvalidJSON", desc: "Test }' # Malformed
-            $pm = New-Object PlaybookManager
-            $pm.LoadPlaybooks($mockPlaybookDir)
-            $pm.LoadedPlaybooks.Count | Should -Be 0 # Should not load the invalid one
+        It "should skip and warn for invalid JSON files" {
+            Set-Content -Path (Join-Path $testDir "valid_pb1.json") -Value '{ "name": "TestPB1", "description": "Valid PB", "steps": [] }'
+            Set-Content -Path (Join-Path $testDir "invalid_json.json") -Value '{ "name": "BrokenPB", "description": "Broken JSON,' # Missing closing brace
+
+            Mock Write-Error {} -Verifiable
+            $pm.LoadPlaybooks($testDir)
+
+            $pm.LoadedPlaybooks.Count | Should -Be 1
+            $pm.LoadedPlaybooks["TestPB1"] | Should -Not -BeNull
+            Should -Invoke Verifiable -CommandName Write-Error -Times 1 -Exactly
         }
 
-        It "skips JSON missing name property" {
-            Set-Content -Path ($mockPlaybookDir + "/noname.json") -Value '{ "description": "No name property" }'
-            $pm = New-Object PlaybookManager
-            $pm.LoadPlaybooks($mockPlaybookDir)
-            $pm.LoadedPlaybooks.Count | Should -Be 0
+        It "should skip and warn for JSON files missing 'name' property" {
+            Set-Content -Path (Join-Path $testDir "valid_pb1.json") -Value '{ "name": "TestPB1", "description": "Valid PB", "steps": [] }'
+            Set-Content -Path (Join-Path $testDir "no_name_pb.json") -Value '{ "description": "No name here", "steps": [] }'
+
+            Mock Write-Warning {} -Verifiable
+            $pm.LoadPlaybooks($testDir)
+
+            $pm.LoadedPlaybooks.Count | Should -Be 1
+            $pm.LoadedPlaybooks["TestPB1"] | Should -Not -BeNull
+            Should -Invoke Verifiable -CommandName Write-Warning -Times 1 -Exactly
         }
 
-        It "loads multiple playbooks correctly" {
-            Set-Content -Path ($mockPlaybookDir + "/pb1.json") -Value '{ "name": "FirstPlaybook", "steps": [] }'
-            Set-Content -Path ($mockPlaybookDir + "/pb2.json") -Value '{ "name": "SecondPlaybook", "steps": [] }'
-            Set-Content -Path ($mockPlaybookDir + "/pb3.json") -Value '{ "name": "ThirdPlaybook", "steps": [] }'
-            $pm = New-Object PlaybookManager
-            $pm.LoadPlaybooks($mockPlaybookDir)
-            $pm.LoadedPlaybooks.Count | Should -Be 3
-            $pm.LoadedPlaybooks["ThirdPlaybook"] | Should -Not -BeNull
+        It "should ignore non-JSON files" {
+             Set-Content -Path (Join-Path $testDir "valid_pb1.json") -Value '{ "name": "TestPB1", "description": "Valid PB", "steps": [] }'
+             Set-Content -Path (Join-Path $testDir "not_a_playbook.txt") -Value 'Hello world'
+             $pm.LoadPlaybooks($testDir)
+             $pm.LoadedPlaybooks.Count | Should -Be 1
+             $pm.LoadedPlaybooks["TestPB1"] | Should -Not -BeNull
         }
     }
 
     Context "GetPlaybook Method" {
-        $pm = New-Object PlaybookManager
-        # Pre-populate LoadedPlaybooks for these tests
-        $pm.LoadedPlaybooks = @{
-            "MyTestPlaybook" = @{ "name" = "MyTestPlaybook"; "data" = "test_data_content" };
-            "AnotherPlaybook" = @{ "name" = "AnotherPlaybook"; "data" = "more_data" }
+        BeforeEach { # Changed from BeforeAll for better isolation if more tests are added
+            $pm.LoadedPlaybooks = @{ "MyPlaybook" = @{ name="MyPlaybook"; steps=@(); description="My Test Playbook" } }
         }
 
-        It "returns loaded playbook by name" {
-            $playbook = $pm.GetPlaybook("MyTestPlaybook")
+        It "should return a playbook if it exists" {
+            $playbook = $pm.GetPlaybook("MyPlaybook")
             $playbook | Should -Not -BeNull
-            $playbook.data | Should -Be "test_data_content"
+            $playbook.name | Should -Be "MyPlaybook"
+            $playbook.description | Should -Be "My Test Playbook"
         }
 
-        It "returns null if name not found" {
-            $playbook = $pm.GetPlaybook("NonExistentPlaybookName")
+        It "should return $null and warn if playbook does not exist" {
+            Mock Write-Warning {} -Verifiable
+            $playbook = $pm.GetPlaybook("NonExistentPlaybook")
             $playbook | Should -BeNull
+            Should -Invoke Verifiable -CommandName Write-Warning -Times 1 -Exactly
         }
     }
 }

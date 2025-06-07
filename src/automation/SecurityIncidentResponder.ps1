@@ -96,10 +96,23 @@ class SecurityIncidentResponder {
 
     [void]TriggerAutomatedResponse([string]$triggerType, [object]$context) {
         Write-Host "TriggerAutomatedResponse called for type '$triggerType' on incident '$($context.IncidentId)'"
+        # Assuming $context.RawIncident exists and might contain specific mock properties
         switch ($triggerType) {
-            "AccountCompromise" { $this._IsolateCompromisedAccount($context); $this._InitiateForensicCollection($context); $this._NotifySecurityTeam($context) }
-            "DataExfiltration" { $this._BlockDataTransfer($context); $this._RevokeSessions($context); $this._InitiateDLP($context) }
-            "MalwareDetection" { $this._IsolateInfectedSystems($context); $this._InitiateAntimalwareScan($context); $this._CollectMalwareSamples($context) }
+            "AccountCompromise" {
+                $this._IsolateCompromisedAccount($context)
+                $this._InitiateForensicCollection($context)
+                $this._NotifySecurityTeam($context)
+            }
+            "DataExfiltration" {
+                $this._BlockDataTransfer($context)
+                $this._RevokeSessions($context)
+                $this._InitiateDLP($context)
+            }
+            "MalwareDetection" {
+                $this._IsolateInfectedSystems($context)
+                $this._InitiateAntimalwareScan($context)
+                $this._CollectMalwareSamples($context)
+            }
             default { $this._ExecuteDefaultResponse($context) }
         }
     }
@@ -359,8 +372,14 @@ class SecurityIncidentResponder {
 
         return $context
     }
-    hidden [void] _DocumentIncidentResponse([object]$incident, [object]$context) { Write-Host "SecurityIncidentResponder._DocumentIncidentResponse() (stub) called for incident: $($incident.Id)" }
-    hidden [void] _EscalateIncident([object]$incident) { Write-Host "SecurityIncidentResponder._EscalateIncident() (stub) called for incident: $($incident.Id)" }
+    hidden [object] _DocumentIncidentResponse([object]$incident, [object]$context) { # Return type changed to object
+        Write-Host "SIR:_DocumentIncidentResponse - Documenting for incident $($incident.Id). Final Status_Mock: $($context.Status)" # Assumes $context.Status
+        return @{ Status = "MockResponseDocumented"; IncidentID = $incident.Id; ReportLocation_Mock = "/cases/incident-$($incident.Id)-final_report.log"; Timestamp = (Get-Date -Format 'u') }
+    }
+    hidden [object] _EscalateIncident([object]$incident) { # Return type changed to object
+        Write-Host "SIR:_EscalateIncident - Escalating incident $($incident.Id). Current Severity_Mock: $($incident.Severity)" # Assumes $incident.Severity
+        return @{ Status = "MockIncidentEscalated"; IncidentID = $incident.Id; EscalationTarget_Mock = "Tier2Support_EmailDL"; Timestamp = (Get-Date -Format 'u') }
+    }
     hidden [void] _ValidateActionResult([object]$actionResult) {
         Write-Host "SecurityIncidentResponder._ValidateActionResult called for action result (Status: $($actionResult.Status))"
         if ($null -eq $actionResult) {
@@ -418,25 +437,74 @@ class SecurityIncidentResponder {
         # Future enhancement: Trigger an escalation or specific alert
         # Example: $this._EscalateIncident($context.RawIncident, "PlaybookActionFailure: $($action.name)")
     }
-    hidden [void] _IsolateCompromisedAccount([object]$context) { Write-Host "SecurityIncidentResponder._IsolateCompromisedAccount() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _InitiateForensicCollection([object]$context) { Write-Host "SecurityIncidentResponder._InitiateForensicCollection() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _NotifySecurityTeam([object]$context) { Write-Host "SecurityIncidentResponder._NotifySecurityTeam() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _BlockDataTransfer([object]$context) { Write-Host "SecurityIncidentResponder._BlockDataTransfer() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _RevokeSessions([object]$context) { Write-Host "SecurityIncidentResponder._RevokeSessions() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _InitiateDLP([object]$context) { Write-Host "SecurityIncidentResponder._InitiateDLP() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _IsolateInfectedSystems([object]$context) { Write-Host "SecurityIncidentResponder._IsolateInfectedSystems() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _InitiateAntimalwareScan([object]$context) { Write-Host "SecurityIncidentResponder._InitiateAntimalwareScan() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _CollectMalwareSamples([object]$context) { Write-Host "SecurityIncidentResponder._CollectMalwareSamples() (stub) called for incident: $($context.IncidentId)" }
-    hidden [void] _ExecuteDefaultResponse([object]$context) { Write-Host "SecurityIncidentResponder._ExecuteDefaultResponse() (stub) called for incident: $($context.IncidentId)" }
-    hidden [object] _CreateIncidentTimeline([object]$incidentContext) {
-        Write-Host "SecurityIncidentResponder._CreateIncidentTimeline() (stub) called for incident: $($incidentContext.IncidentId)"; return @( @{ Timestamp = $incidentContext.ReceivedTime; Event = "Incident Received" }, @{ Timestamp = Get-Date; Event = "Report Generated (stub)" } )
+    hidden [object] _IsolateCompromisedAccount([object]$context) { # Return type changed
+        Write-Host "SIR:_IsolateCompromisedAccount - For incident $($context.IncidentId). User: $($context.RawIncident.AffectedUser_Mock)"
+        return @{ Status = "MockIsolationTriggered"; User = $context.RawIncident.AffectedUser_Mock; Actions_Mock = @("PasswordReset", "SessionRevoke"); Timestamp = (Get-Date -Format 'u') }
     }
-    hidden [object] _AssessIncidentImpact([object]$incidentContext) { Write-Host "SecurityIncidentResponder._AssessIncidentImpact() (stub) called for incident: $($incidentContext.IncidentId)"; return @{ Severity = "Medium"; Scope = "Limited"; BusinessImpact = "Low" } }
-    hidden [string] _GetContainmentStatus([object]$incidentContext) { Write-Host "SecurityIncidentResponder._GetContainmentStatus() (stub) called."; return "Pending" }
-    hidden [string] _GetRemediationStatus([object]$incidentContext) { Write-Host "SecurityIncidentResponder._GetRemediationStatus() (stub) called."; return "Pending" }
-    hidden [object] _GetForensicFindings([string]$incidentId) {
-        Write-Host "SecurityIncidentResponder._GetForensicFindings() (stub) called for incident: $incidentId"
-        return @{ Findings = "No forensic findings (stub)."; Confidence = "Low" }
+    hidden [object] _InitiateForensicCollection([object]$context) { # Return type changed
+        Write-Host "SIR:_InitiateForensicCollection - For incident $($context.IncidentId). Target: $($context.RawIncident.AffectedDevice_Mock)"
+        return @{ Status = "MockForensicCollectionQueued"; Target = $context.RawIncident.AffectedDevice_Mock; Tool_Mock = "RemoteScriptExecution"; Timestamp = (Get-Date -Format 'u') }
+    }
+    hidden [object] _NotifySecurityTeam([object]$context) { # Return type changed
+        Write-Host "SIR:_NotifySecurityTeam - For incident $($context.IncidentId). Severity: $($context.CurrentSeverity)"
+        return @{ Status = "MockNotificationSent"; Team_Mock = "SecurityOperationsCenter_DL"; IncidentID = $context.IncidentId; Timestamp = (Get-Date -Format 'u') }
+    }
+    hidden [object] _BlockDataTransfer([object]$context) { # Return type changed
+        Write-Host "SIR:_BlockDataTransfer - For incident $($context.IncidentId). DataPattern_Mock: $($context.RawIncident.DataPattern_Mock)"
+        return @{ Status = "MockDataTransferBlockApplied"; Policy_Mock = "DLP_Rule_SensitiveData_XYZ"; Target_Mock = $context.RawIncident.DataSource_Mock; Timestamp = (Get-Date -Format 'u') }
+    }
+    hidden [object] _RevokeSessions([object]$context) { # Return type changed
+        Write-Host "SIR:_RevokeSessions - For incident $($context.IncidentId). User: $($context.RawIncident.AffectedUser_Mock)"
+        return @{ Status = "MockSessionsRevoked"; User = $context.RawIncident.AffectedUser_Mock; SessionCount_Mock = (Get-Random -Min 1 -Max 5); Timestamp = (Get-Date -Format 'u') }
+    }
+    hidden [object] _InitiateDLP([object]$context) { # Return type changed
+        Write-Host "SIR:_InitiateDLP - For incident $($context.IncidentId). Details: $($context.RawIncident.DLPDetails_Mock)"
+        return @{ Status = "MockDLPScanInitiated"; Profile_Mock = "FullSensitiveDataScan_Profile"; Target_Mock = "AllUserEndpoints_Global"; Timestamp = (Get-Date -Format 'u') }
+    }
+    hidden [object] _IsolateInfectedSystems([object]$context) { # Return type changed
+        Write-Host "SIR:_IsolateInfectedSystems - For incident $($context.IncidentId). System_Mock: $($context.RawIncident.AffectedDevice_Mock)"
+        return @{ Status = "MockSystemIsolationApplied"; System_Mock = $context.RawIncident.AffectedDevice_Mock; Method_Mock = "NetworkACL_FirewallRule"; Timestamp = (Get-Date -Format 'u') }
+    }
+    hidden [object] _InitiateAntimalwareScan([object]$context) { # Return type changed
+        Write-Host "SIR:_InitiateAntimalwareScan - For incident $($context.IncidentId). System_Mock: $($context.RawIncident.AffectedDevice_Mock)"
+        return @{ Status = "MockAntimalwareScanStarted"; System_Mock = $context.RawIncident.AffectedDevice_Mock; ScanType_Mock = "Deep_FullSystem"; Timestamp = (Get-Date -Format 'u') }
+    }
+    hidden [object] _CollectMalwareSamples([object]$context) { # Return type changed
+        Write-Host "SIR:_CollectMalwareSamples - For incident $($context.IncidentId). Hash_Mock: $($context.RawIncident.MalwareHash_Mock)"
+        return @{ Status = "MockSampleCollectionAttempted"; Hash_Mock = $context.RawIncident.MalwareHash_Mock; Storage_Mock = "SecureMalwareVault_SFTP"; Timestamp = (Get-Date -Format 'u') }
+    }
+    hidden [object] _ExecuteDefaultResponse([object]$context) { # Return type changed
+        Write-Host "SIR:_ExecuteDefaultResponse - For Unclassified/Default incident $($context.IncidentId). Assigning for manual review."
+        return @{ Status = "MockDefaultResponseExecuted"; Actions_Mock = @("LogForManualReview", "AssignToTier1Queue_ServiceNow"); Timestamp = (Get-Date -Format 'u') }
+    }
+    hidden [array] _CreateIncidentTimeline([object]$incidentContext) { # Return type specified as array
+        Write-Host "SIR:_CreateIncidentTimeline - For incident $($incidentContext.IncidentId)"
+        return @(
+            @{ Timestamp = $incidentContext.ReceivedTime.ToString('u'); Event = "Incident Received"; Details = $incidentContext.RawIncident.Title },
+            @{ Timestamp = $incidentContext.ReceivedTime.AddMinutes(2).ToString('u'); Event = "Context Created"; IncidentID = $incidentContext.IncidentId},
+            @{ Timestamp = $incidentContext.ReceivedTime.AddMinutes(5).ToString('u'); Event = "Playbook Started"; Details = $incidentContext.PlaybookExecution.CurrentPlaybookName },
+            @{ Timestamp = (Get-Date -Format 'u'); Event = "Report Generated" }
+        )
+    }
+    hidden [hashtable] _AssessIncidentImpact([object]$incidentContext) { # Return type specified as hashtable
+        Write-Host "SIR:_AssessIncidentImpact - For incident $($incidentContext.IncidentId)"
+        return @{ Severity = $incidentContext.CurrentSeverity; Scope_Mock = "MultipleUsers_FinanceDept_Mock"; BusinessImpact_Mock = "Medium_PotentialServiceDisruption_Payroll"; DataImpact_Mock = "Low_NoPIIConfirmed_Mock"; SystemsAffected_Mock = @($incidentContext.RawIncident.AffectedDevice_Mock) }
+    }
+    hidden [string] _GetContainmentStatus([object]$incidentContext) {
+        Write-Host "SIR:_GetContainmentStatus - For incident $($incidentContext.IncidentId)"
+        return "Contained_Full_Mock"
+    }
+    hidden [string] _GetRemediationStatus([object]$incidentContext) {
+        Write-Host "SIR:_GetRemediationStatus - For incident $($incidentContext.IncidentId)"
+        return "Remediated_Verified_Mock"
+    }
+    hidden [hashtable] _GetForensicFindings([string]$incidentId) { # Return type specified as hashtable
+        Write-Host "SIR:_GetForensicFindings (Report) - For incident $incidentId"
+        if ($this.ActiveIncidents.ContainsKey($incidentId) -and $null -ne $this.ActiveIncidents[$incidentId].ForensicFindings) {
+            return @{ FindingsSummary_Mock = "Retrieved from ActiveIncidents. ThreatHunter analysis complete."; IOCs_Mock = $this.ActiveIncidents[$incidentId].IdentifiedIOCs; AnalysisDetails_Mock = $this.ActiveIncidents[$incidentId].ForensicFindings }
+        } else {
+            return @{ FindingsSummary_Mock = "No detailed forensic findings in ActiveIncidents for $incidentId or analysis pending/failed."; IOCs_Mock = @() }
+        }
     }
     hidden [object] _AnalyzeForensicData([object]$forensicData) {
         Write-Host "SecurityIncidentResponder._AnalyzeForensicData called."
@@ -510,6 +578,12 @@ Report Generated: $(Get-Date)
         #    $this.ActiveIncidents[$incidentId].Notes.Add("Forensic Report Generated: $reportText")
         # }
     }
-    hidden [object] _CompileLessonsLearned([object]$incidentContext) { Write-Host "SecurityIncidentResponder._CompileLessonsLearned() (stub) called."; return @{ Observation = "Stub observation."} }
-    hidden [object] _CalculateResponseMetrics([object]$incidentContext) { Write-Host "SecurityIncidentResponder._CalculateResponseMetrics() (stub) called."; return @{ TimeToDetection = "N/A"; TimeToResponse = "N/A" } }
+    hidden [hashtable] _CompileLessonsLearned([object]$incidentContext) { # Return type specified as hashtable
+        Write-Host "SIR:_CompileLessonsLearned - For incident $($incidentContext.IncidentId)"
+        return @{ Observation_Mock = "Initial alert triage for $($incidentContext.Classification) was delayed by 15 minutes due to high queue volume."; Recommendation_Mock = "Review alert pipeline performance and consider dynamic prioritization for high-severity classifications."; IncidentID = $incidentContext.IncidentId }
+    }
+    hidden [hashtable] _CalculateResponseMetrics([object]$incidentContext) { # Return type specified as hashtable
+        Write-Host "SIR:_CalculateResponseMetrics - For incident $($incidentContext.IncidentId)"
+        return @{ TimeToDetection_Mock = "00:10:00"; TimeToAcknowledge_Mock = "00:05:30"; TimeToResponseAction_Mock = "00:25:15"; TimeToContainment_Mock = "02:15:00"; FullResolutionTime_Mock = "05:30:45"; IncidentID = $incidentContext.IncidentId }
+    }
 }
