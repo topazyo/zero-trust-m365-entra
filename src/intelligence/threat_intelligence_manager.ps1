@@ -50,13 +50,13 @@ class ThreatIntelligenceManager {
         }
 
         $analysis.RiskAssessment = $this._AssessThreatRisk($analysis.MatchedThreats)
-        $analysis.RecommendedActions = $this._GenerateActionRecommendations($analysis)
+        $analysis.RecommendedActions = $this._GenerateActionRecommendations($analysis.RiskAssessment) # Pass the sub-object
 
         return $analysis
     }
 
     [void]HandleIntelligenceAlert([object]$alert) {
-        switch ($alert.Severity) {
+        switch ($alert.ThreatDetails_Mock.Severity_Mock) { # Access nested property for severity
             "Critical" {
                 $this._InitiateEmergencyResponse($alert)
                 $this._BlockThreatenedAssets($alert)
@@ -76,116 +76,103 @@ class ThreatIntelligenceManager {
     }
 
     hidden [object] _InitializeIntelligenceEngine() {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _InitializeIntelligenceEngine (stub) called."
-        if ("_InitializeIntelligenceEngine" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _InitializeIntelligenceEngine" } }
-        if ("_InitializeIntelligenceEngine" -match "CorrelateThreats") { return @() }
-        return $null
+        Write-Host "TIM:_InitializeIntelligenceEngine - Initializing (e.g., connecting to MISP, TI feeds)."
+        $this.IntelligenceEngine = @{ Status = "Initialized_Mock"; EngineType = "MockThreatIntelPlatform"; ConnectionTime = (Get-Date -Format 'u') }
+        return $this.IntelligenceEngine
     }
     hidden [object] _LoadThreatFeeds() {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _LoadThreatFeeds (stub) called."
-        if ("_LoadThreatFeeds" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _LoadThreatFeeds" } }
-        if ("_LoadThreatFeeds" -match "CorrelateThreats") { return @() }
-        return $null
+        Write-Host "TIM:_LoadThreatFeeds - Loading threat feeds (e.g., from configured sources)."
+        $this.ThreatFeeds = @{
+            "OSINT_Feed_Example" = @{ Name = "OSINT_Feed_Example"; Type = "URLList"; UpdateFrequency = "Daily"; LastUpdate = (Get-Date).AddDays(-1).ToString('u'); Status = "Active_Mock" };
+            "Commercial_Feed_Example" = @{ Name = "Commercial_Feed_Example"; Type = "STIX_API"; UpdateFrequency = "Hourly"; Status = "Active_Mock" }
+        }
+        return $this.ThreatFeeds
     }
-    hidden [object] _CollectIntelligence() {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _CollectIntelligence (stub) called."
-        if ("_CollectIntelligence" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _CollectIntelligence" } }
-        if ("_CollectIntelligence" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [array] _CollectIntelligence() { # Return type hinted as array
+        Write-Host "TIM:_CollectIntelligence - Collecting from all active sources."
+        return @(
+            @{ SourceFeed = "OSINT_Feed_Example"; DataType = "ipv4-addr"; Value = "198.51.100.10"; FirstSeen_Mock = (Get-Date).AddHours(-6).ToString('u'); Tags_Mock = @("scanner","bruteforce") },
+            @{ SourceFeed = "Commercial_Feed_Example"; DataType = "domain-name"; Value = "malicious-domain-example.com"; FirstSeen_Mock = (Get-Date).AddHours(-2).ToString('u'); Tags_Mock = @("malware","c2") }
+        )
     }
-    hidden [object] _EnrichIntelligence() {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _EnrichIntelligence (stub) called."
-        if ("_EnrichIntelligence" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _EnrichIntelligence" } }
-        if ("_EnrichIntelligence" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [array] _EnrichIntelligence([array]$rawIntelItems) { # Parameter type specified, return type hinted
+        Write-Host "TIM:_EnrichIntelligence - Enriching $($rawIntelItems.Count) raw intelligence items."
+        return $rawIntelItems | ForEach-Object { $_.EnrichmentStatus_Mock = "Success"; $_.GeoLocation_Mock = "MockLocation_"$($_.Value.Split('.')[0]); $_.ReputationScore_Mock = (Get-Random -Minimum 60 -Maximum 100); $_ }
     }
-    hidden [object] _CorrelateThreats() {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _CorrelateThreats (stub) called."
-        if ("_CorrelateThreats" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _CorrelateThreats" } }
-        if ("_CorrelateThreats" -match "CorrelateThreats") { return @() } # This was specific in prompt for ThreatHunter, applying generally
-        return @()
+    hidden [array] _CorrelateThreats([array]$enrichedIntelItems) { # Parameter type specified, return type hinted
+        Write-Host "TIM:_CorrelateThreats - Correlating $($enrichedIntelItems.Count) items with internal telemetry."
+        # Ensure enrichedIntelItems has at least two items for this mock to work without error
+        if ($enrichedIntelItems.Count -lt 2) {
+            Write-Warning "TIM:_CorrelateThreats - Mock implementation expects at least 2 items for full demonstration."
+            return @()
+        }
+        return @(
+            @{ MatchedIndicator = $enrichedIntelItems[0].Value; InternalAsset_Mock = "WebServer_Prod_01"; Severity_Mock = "High"; CorrelationRule_Mock = "HighRiskIP_WebServer" },
+            @{ MatchedIndicator = $enrichedIntelItems[1].Value; InternalAsset_Mock = "UserDesktop_Sales_77"; Severity_Mock = "Medium"; CorrelationRule_Mock = "MaliciousDomain_UserAccess" }
+        )
     }
-    hidden [object] _UpdateThreatDatabase() {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _UpdateThreatDatabase (stub) called."
-        if ("_UpdateThreatDatabase" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _UpdateThreatDatabase" } }
-        if ("_UpdateThreatDatabase" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [hashtable] _UpdateThreatDatabase([object]$threatsOrAlertData) { # Return type hinted
+        Write-Host "TIM:_UpdateThreatDatabase - Updating with items/alert: $($threatsOrAlertData | ConvertTo-Json -Depth 2 -Compress -WarningAction SilentlyContinue)"
+        return @{ Status = "DatabaseUpdated_Mock"; ItemsProcessed = if ($threatsOrAlertData -is [array]) { $threatsOrAlertData.Count } else { 1 }; Timestamp = (Get-Date -Format 'u') }
     }
-    hidden [object] _GenerateIntelligenceAlerts() {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _GenerateIntelligenceAlerts (stub) called."
-        if ("_GenerateIntelligenceAlerts" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _GenerateIntelligenceAlerts" } }
-        if ("_GenerateIntelligenceAlerts" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [array] _GenerateIntelligenceAlerts([array]$correlatedThreats) { # Parameter type specified, return type hinted
+        Write-Host "TIM:_GenerateIntelligenceAlerts - For $($correlatedThreats.Count) correlated threats."
+        return $correlatedThreats | Where-Object { $_.Severity_Mock -match "High|Critical" } | ForEach-Object { @{ AlertID_Mock = "TIM-ALERT-$((Get-Random -Minimum 1000 -Maximum 9999))"; ThreatDetails_Mock = $_; Status_Mock = "New"; Timestamp = (Get-Date -Format 'u') } }
     }
-    hidden [object] _MatchThreatIndicator([object]$indicator) { # Added param for context
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _MatchThreatIndicator (stub) called for indicator: $indicator"
-        # This stub needs to return a hashtable with a 'Confidence' property for AnalyzeThreatIndicators
-        return @{ Confidence = 70; Message = "Stubbed MatchThreatIndicator for $indicator" } # Default to lower confidence
+    hidden [hashtable] _MatchThreatIndicator([object]$indicator) { # Return type hinted
+        Write-Host "TIM:_MatchThreatIndicator - Matching indicator: $indicator"
+        if ($indicator -like "*malicious*" -or $indicator -like "198.51.100.10") {
+            return @{ Matched = $true; Confidence = 85; ThreatName_Mock = "KnownMaliciousPattern_Mock"; Source_Mock = "InternalDB_Mock"; Indicator = $indicator }
+        } else {
+            return @{ Matched = $false; Confidence = 30; Indicator = $indicator }
+        }
     }
-    hidden [object] _TriggerThreatResponse([object]$threatMatch) { # Added param for context
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _TriggerThreatResponse (stub) called for threat: $($threatMatch | Out-String)"
-        if ("_TriggerThreatResponse" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _TriggerThreatResponse" } }
-        if ("_TriggerThreatResponse" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [hashtable] _TriggerThreatResponse([object]$threatMatch) { # Return type hinted
+        Write-Host "TIM:_TriggerThreatResponse - For match: $($threatMatch.ThreatName_Mock) on indicator $($threatMatch.Indicator)" # Assumes ThreatName_Mock and Indicator properties
+        return @{ Status = "ResponseTriggered_Mock"; Action_Mock = "AutomatedBlockRule_Firewall_Mock"; TargetIndicator_Mock = $threatMatch.Indicator; Timestamp = (Get-Date -Format 'u') }
     }
-    hidden [object] _AssessThreatRisk([object]$matchedThreats) { # Added param for context
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _AssessThreatRisk (stub) called for $($matchedThreats.Count) threats."
-        return @{ AssessedSeverity = "Low"; Notes = "Stubbed risk assessment" } # Should return a hashtable
+    hidden [hashtable] _AssessThreatRisk([array]$matchedThreats) { # Parameter type specified, return type hinted
+        Write-Host "TIM:_AssessThreatRisk - Assessing risk for $($matchedThreats.Count) matched threats."
+        return @{ OverallRisk_Mock = "High"; TopThreat_Mock = if($matchedThreats.Count -gt 0){$matchedThreats[0].ThreatName_Mock}else{"N/A"}; Confidence_Mock = "Good"; Timestamp = (Get-Date -Format 'u') } # Assumes ThreatName_Mock
     }
-    hidden [object] _GenerateActionRecommendations([object]$analysis) { # Added param for context
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _GenerateActionRecommendations (stub) called for analysis: $($analysis | Out-String)"
-        return @("StubRecommendation1", "StubRecommendation2") # Should return an array
+    hidden [array] _GenerateActionRecommendations([object]$analysisContext) { # Parameter type specified as object, return type hinted
+        Write-Host "TIM:_GenerateActionRecommendations - For analysis with OverallRisk: $($analysisContext.OverallRisk_Mock)" # Assumes OverallRisk_Mock and TopThreat_Mock
+        return @( "Isolate systems related to $($analysisContext.TopThreat_Mock).", "Scan environment for $($analysisContext.TopThreat_Mock) IOCs.", "Update firewall/proxy rules for related indicators." )
     }
-    hidden [object] _InitiateEmergencyResponse([object]$alert) {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _InitiateEmergencyResponse (stub) called for alert: $($alert | Out-String)"
-        if ("_InitiateEmergencyResponse" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _InitiateEmergencyResponse" } }
-        if ("_InitiateEmergencyResponse" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [hashtable] _InitiateEmergencyResponse([object]$alert) {
+        Write-Host "TIM:_InitiateEmergencyResponse - Called for alert: $($alert.AlertID_Mock)" # Assumes AlertID_Mock
+        return @{ Status = "MockExecution"; Method = "_InitiateEmergencyResponse"; AlertID_Received = $alert.AlertID_Mock; Timestamp = (Get-Date -Format 'u') }
     }
-    hidden [object] _BlockThreatenedAssets([object]$alert) {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _BlockThreatenedAssets (stub) called for alert: $($alert | Out-String)"
-        if ("_BlockThreatenedAssets" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _BlockThreatenedAssets" } }
-        if ("_BlockThreatenedAssets" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [hashtable] _BlockThreatenedAssets([object]$alert) {
+        Write-Host "TIM:_BlockThreatenedAssets - Called for alert: $($alert.AlertID_Mock)"
+        return @{ Status = "MockExecution"; Method = "_BlockThreatenedAssets"; AlertID_Received = $alert.AlertID_Mock; Timestamp = (Get-Date -Format 'u') }
     }
-    hidden [object] _NotifySecurityTeam([object]$alert) {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _NotifySecurityTeam (stub) called for alert: $($alert | Out-String)"
-        if ("_NotifySecurityTeam" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _NotifySecurityTeam" } }
-        if ("_NotifySecurityTeam" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [hashtable] _NotifySecurityTeam([object]$alert) {
+        Write-Host "TIM:_NotifySecurityTeam - Called for alert: $($alert.AlertID_Mock)"
+        return @{ Status = "MockExecution"; Method = "_NotifySecurityTeam"; AlertID_Received = $alert.AlertID_Mock; Timestamp = (Get-Date -Format 'u') }
     }
-    hidden [object] _UpdateDefenses([object]$alert) {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _UpdateDefenses (stub) called for alert: $($alert | Out-String)"
-        if ("_UpdateDefenses" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _UpdateDefenses" } }
-        if ("_UpdateDefenses" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [hashtable] _UpdateDefenses([object]$alert) {
+        Write-Host "TIM:_UpdateDefenses - Called for alert: $($alert.AlertID_Mock)"
+        return @{ Status = "MockExecution"; Method = "_UpdateDefenses"; AlertID_Received = $alert.AlertID_Mock; Timestamp = (Get-Date -Format 'u') }
     }
-    hidden [object] _EnhanceMonitoring([object]$alert) {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _EnhanceMonitoring (stub) called for alert: $($alert | Out-String)"
-        if ("_EnhanceMonitoring" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _EnhanceMonitoring" } }
-        if ("_EnhanceMonitoring" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [hashtable] _EnhanceMonitoring([object]$alert) {
+        Write-Host "TIM:_EnhanceMonitoring - Called for alert: $($alert.AlertID_Mock)"
+        return @{ Status = "MockExecution"; Method = "_EnhanceMonitoring"; AlertID_Received = $alert.AlertID_Mock; Timestamp = (Get-Date -Format 'u') }
     }
-    hidden [object] _UpdateSecurityControls([object]$alert) {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _UpdateSecurityControls (stub) called for alert: $($alert | Out-String)"
-        if ("_UpdateSecurityControls" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _UpdateSecurityControls" } }
-        if ("_UpdateSecurityControls" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [hashtable] _UpdateSecurityControls([object]$alert) {
+        Write-Host "TIM:_UpdateSecurityControls - Called for alert: $($alert.AlertID_Mock)"
+        return @{ Status = "MockExecution"; Method = "_UpdateSecurityControls"; AlertID_Received = $alert.AlertID_Mock; Timestamp = (Get-Date -Format 'u') }
     }
-    hidden [object] _CreateIncidentTicket([object]$alert) {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _CreateIncidentTicket (stub) called for alert: $($alert | Out-String)"
-        if ("_CreateIncidentTicket" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _CreateIncidentTicket" } }
-        if ("_CreateIncidentTicket" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [hashtable] _CreateIncidentTicket([object]$alert) {
+        Write-Host "TIM:_CreateIncidentTicket - Called for alert: $($alert.AlertID_Mock)"
+        return @{ Status = "MockExecution"; Method = "_CreateIncidentTicket"; AlertID_Received = $alert.AlertID_Mock; Timestamp = (Get-Date -Format 'u') }
     }
-    hidden [object] _LogIntelligenceAlert([object]$alert) {
-        Write-Host "src/intelligence/threat_intelligence_manager.ps1 -> _LogIntelligenceAlert (stub) called for alert: $($alert | Out-String)"
-        if ("_LogIntelligenceAlert" -match "Get|Load|Collect|Compare|Assess|Analyze") { return @{ StubResult = "Data for _LogIntelligenceAlert" } }
-        if ("_LogIntelligenceAlert" -match "CorrelateThreats") { return @() }
-        return $null
+    hidden [hashtable] _LogIntelligenceAlert([object]$alert) {
+        Write-Host "TIM:_LogIntelligenceAlert - Called for alert: $($alert.AlertID_Mock)"
+        return @{ Status = "MockExecution"; Method = "_LogIntelligenceAlert"; AlertID_Received = $alert.AlertID_Mock; Timestamp = (Get-Date -Format 'u') }
     }
 
-    # --- Method: GetRelatedThreatIntel (New Implemented Mock) ---
+    # --- Method: GetRelatedThreatIntel (already implemented mock) ---
     [object] GetRelatedThreatIntel([string]$incidentId) {
         Write-Host "ThreatIntelligenceManager.GetRelatedThreatIntel called for incident: $incidentId (Implemented Mock)"
         # Mock implementation: Return different intel based on a hypothetical incident ID
