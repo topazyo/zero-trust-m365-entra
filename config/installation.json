@@ -8,6 +8,7 @@
   },
   "ConnectionSettings": {
     "TenantId": "YOUR_TENANT_ID",
+    "TenantId_HelpText": "This TenantId needs to be updated. Run Initialize-Environment.ps1 with the -TenantId parameter, set the AZURE_TENANT_ID environment variable, or edit this file manually.",
     "RequiredScopes": [
       "User.Read.All",
       "Group.ReadWrite.All",
@@ -22,6 +23,5 @@
   "MonitoringSettings": {
     "MonitoringConfigPath": "./config/monitoring_settings.json",
     "EnableRealTimeMonitoring": true
-  },
-  "Comments": "This is a placeholder configuration file. Update with actual values and requirements."
+  }
 }
